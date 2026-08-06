@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { useParams, useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 
 export default function TimelineBooking() {
   const { id } = useParams();
@@ -26,59 +28,71 @@ export default function TimelineBooking() {
       if (shopSettings) {
         setBusinessName(JSON.parse(shopSettings).brandName || "PLAYBOX");
       }
+    }
 
-      const saved = localStorage.getItem('playbox_mock_bookings');
-      if (saved) {
-        const bookings = JSON.parse(saved);
-        const b = bookings.find((b: any) => b.id === id);
-        if (b) {
-          setBookingData(b);
-          
-          // Generate dynamic stages based on delivery requirement
-          let dynamicStages = [
-            'Sedang Dipakai',
-            b.requireDelivery ? 'Dijemput' : 'Dikembalikan (Toko)',
-            'Pengecekan Barang',
-            'Selesai'
-          ];
-          setStages(dynamicStages);
+    if (!id || typeof id !== 'string') return;
 
-          // Find current stage index
-          // Note: b.status might be slightly different in wording, let's map it safely
-          let idx = dynamicStages.findIndex(s => s.toLowerCase().includes(b.status.toLowerCase()));
-          
-          // Fallbacks for known mismatches
-          if (idx === -1) {
-            if (b.status === 'Persiapan') idx = dynamicStages.findIndex(s => s.includes('Persiapan'));
-            if (b.status === 'Booking Dibuat') idx = 0;
-            if (b.status === 'Dikembalikan') idx = dynamicStages.findIndex(s => s.includes('Dikembalikan'));
-          }
-
-          const currentIdx = idx !== -1 ? idx + 1 : 1;
-          setCurrentStage(currentIdx);
-
-          // Generate logical mock times for past stages to remove "dummy data" feeling
-          const times: Record<number, string> = {};
-          if (b.time) {
-            // b.time is typically "23 Jul 2026, 14:00"
-            try {
-              const [datePart, timePart] = b.time.split(', ');
-              const [hStr, mStr] = timePart.split(':');
-              let baseDate = new Date();
-              baseDate.setHours(parseInt(hStr), parseInt(mStr), 0);
-
-              for (let i = 1; i < currentIdx; i++) {
-                times[i] = baseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                baseDate.setMinutes(baseDate.getMinutes() + Math.floor(Math.random() * 20) + 5); // Add 5-25 mins per step
-              }
-            } catch (e) {
-              // fallback
-            }
-          }
-          setCompletedTimes(times);
+    // 1. Real-time Firestore document listener
+    const unsubscribe = onSnapshot(doc(db, 'bookings', id), (docSnap) => {
+      let b: any = null;
+      if (docSnap.exists()) {
+        b = { ...docSnap.data(), id: docSnap.id };
+      } else {
+        const saved = localStorage.getItem('playbox_mock_bookings');
+        if (saved) {
+          const bookings = JSON.parse(saved);
+          b = bookings.find((item: any) => item.id === id);
         }
       }
-    }
+
+      if (b) {
+        setBookingData(b);
+        
+        // Generate dynamic stages based on delivery requirement
+        let dynamicStages = [
+          'Sedang Dipakai',
+          b.requireDelivery ? 'Dijemput' : 'Dikembalikan (Toko)',
+          'Pengecekan Barang',
+          'Selesai'
+        ];
+        setStages(dynamicStages);
+
+        // Find current stage index
+        let idx = dynamicStages.findIndex(s => s.toLowerCase().includes(b.status?.toLowerCase() || ''));
+        
+        // Fallbacks for known mismatches
+        if (idx === -1) {
+          if (b.status === 'Persiapan') idx = dynamicStages.findIndex(s => s.includes('Persiapan'));
+          if (b.status === 'Booking Dibuat') idx = 0;
+          if (b.status === 'Dikembalikan') idx = dynamicStages.findIndex(s => s.includes('Dikembalikan'));
+          if (b.status === 'Selesai') idx = dynamicStages.length - 1;
+        }
+
+        const currentIdx = idx !== -1 ? idx + 1 : 1;
+        setCurrentStage(currentIdx);
+
+        // Generate logical mock times for past stages
+        const times: Record<number, string> = {};
+        if (b.time) {
+          try {
+            const [datePart, timePart] = b.time.split(', ');
+            const [hStr, mStr] = timePart.split(':');
+            let baseDate = new Date();
+            baseDate.setHours(parseInt(hStr), parseInt(mStr), 0);
+
+            for (let i = 1; i < currentIdx; i++) {
+              times[i] = baseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              baseDate.setMinutes(baseDate.getMinutes() + Math.floor(Math.random() * 20) + 5);
+            }
+          } catch (e) {
+            // fallback
+          }
+        }
+        setCompletedTimes(times);
+      }
+    });
+
+    return () => unsubscribe();
   }, [id]);
 
   useEffect(() => {
@@ -107,7 +121,9 @@ export default function TimelineBooking() {
   }, [bookingData?.endTime, bookingData?.isoEnd]);
 
 
-  const handleUpdateStatus = () => {
+  const handleUpdateStatus = async () => {
+    if (!bookingData) return;
+
     // Current stage corresponds to `stages[currentStage - 1]`
     const currentStatusName = stages[currentStage - 1];
 
@@ -129,19 +145,34 @@ export default function TimelineBooking() {
       setCompletedTimes(prev => ({ ...prev, [currentStage]: timeStr }));
       setCurrentStage(prev => prev + 1);
 
-      // Save to localStorage
+      let color = 'bg-white/10 text-white';
+      if (nextStatusName === 'Sedang Dipakai') color = 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20';
+      else if (nextStatusName.includes('Dijemput') || nextStatusName.includes('Dikembalikan')) color = 'bg-purple-500/15 text-purple-400';
+      else if (nextStatusName === 'Selesai') color = 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20';
+      
+      // Clean up status name for DB
+      let cleanStatus = nextStatusName.replace(' (Ambil di Toko)', '').replace(' (Toko)', '');
+
+      // 1. Update Firestore
+      try {
+        if (id && typeof id === 'string') {
+          await updateDoc(doc(db, 'bookings', id), {
+            status: cleanStatus,
+            statusColor: color,
+            needAction: false,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (err) {
+        console.error('Failed to update stage in Firestore:', err);
+      }
+
+      // 2. Save to localStorage
       const savedBookings = localStorage.getItem('playbox_mock_bookings');
       if (savedBookings) {
         const parsedBookings = JSON.parse(savedBookings);
         const updatedBookings = parsedBookings.map((b: any) => {
           if (b.id === id) {
-            let color = 'bg-white/10 text-white';
-            if (nextStatusName === 'Sedang Dipakai') color = 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20';
-            else if (nextStatusName.includes('Dijemput') || nextStatusName.includes('Dikembalikan')) color = 'bg-purple-500/15 text-purple-400';
-            
-            // Clean up status name for DB
-            let cleanStatus = nextStatusName.replace(' (Ambil di Toko)', '').replace(' (Toko)', '');
-
             return {
               ...b,
               status: cleanStatus,

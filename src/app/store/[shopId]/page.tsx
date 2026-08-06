@@ -6,7 +6,7 @@ import 'react-day-picker/dist/style.css';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { db } from '@/lib/firebase';
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
 export default function StorefrontPage({ params }: { params: Promise<{ shopId: string }> }) {
   const router = useRouter();
@@ -81,6 +81,28 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
     fetchStoreData();
 
+    // Real-time listener for active bookings to automatically reflect unit availability across all devices
+    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const activeBookings = snapshot.docs
+        .map(doc => doc.data())
+        .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
+      
+      const busyUnitKeys = new Set(
+        activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
+      );
+
+      setUnits(prev => prev.map(u => {
+        if (u.status === 'Maintenance') return u;
+        const isBusy = busyUnitKeys.has(u.id) || busyUnitKeys.has(u.name);
+        return {
+          ...u,
+          status: isBusy ? 'Disewa' : 'Ready'
+        };
+      }));
+    }, (err) => {
+      console.warn('Store bookings listener err:', err);
+    });
+
     const handleStorage = (e: StorageEvent) => {
       if (['playbox_mock_units', 'playbox_shop_settings'].includes(e.key || '')) {
         fetchStoreData();
@@ -88,7 +110,10 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     };
 
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      unsubBookings();
+    };
 
   }, [unwrappedParams.shopId]);
 

@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 export default function UnitList() {
   const router = useRouter();
@@ -33,6 +35,31 @@ export default function UnitList() {
       setUnits(defaultUnits);
       localStorage.setItem('playbox_mock_units', JSON.stringify(defaultUnits));
     }
+
+    // Real-time listener from Firestore active bookings
+    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const activeBookings = snapshot.docs
+        .map(doc => doc.data())
+        .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
+      
+      const busyUnitKeys = new Set(
+        activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
+      );
+
+      setUnits(prev => prev.map(u => {
+        if (u.status === 'Maintenance') return u;
+        const isBusy = busyUnitKeys.has(u.id) || busyUnitKeys.has(u.name);
+        return {
+          ...u,
+          status: isBusy ? 'Disewa' : 'Ready',
+          statusColor: isBusy ? 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20' : 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20'
+        };
+      }));
+    }, (err) => {
+      console.warn('Unit bookings listener err:', err);
+    });
+
+    return () => unsubBookings();
   }, []);
 
   const filteredUnits = units.filter(u => {

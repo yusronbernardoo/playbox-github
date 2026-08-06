@@ -2,6 +2,8 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = use(params);
@@ -21,23 +23,46 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const [dendaRules, setDendaRules] = useState({ tolerance: 15, hourlyRate: 20000 });
 
   useEffect(() => {
-    // Load Rules
-    const savedRules = localStorage.getItem('playbox_denda_rules');
-    if (savedRules) {
-      setDendaRules(JSON.parse(savedRules));
-    }
+    const loadBookingData = async () => {
+      // Load Rules
+      let rules = { tolerance: 15, hourlyRate: 20000 };
+      const savedRules = localStorage.getItem('playbox_denda_rules');
+      if (savedRules) {
+        rules = JSON.parse(savedRules);
+        setDendaRules(rules);
+      }
 
-    // Load Booking
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
-    if (savedBookings) {
-      const parsed = JSON.parse(savedBookings);
-      const found = parsed.find((b: any) => b.id === id);
+      let found: any = null;
+
+      // 1. Fetch from Firestore
+      try {
+        if (id && typeof id === 'string') {
+          const docSnap = await getDoc(doc(db, 'bookings', id));
+          if (docSnap.exists()) {
+            found = { ...docSnap.data(), id: docSnap.id };
+          }
+        }
+      } catch (e) {
+        console.warn('Firestore fallback on invoice:', e);
+      }
+
+      // 2. Fallback to localStorage
+      if (!found) {
+        const savedBookings = localStorage.getItem('playbox_mock_bookings');
+        if (savedBookings) {
+          const parsed = JSON.parse(savedBookings);
+          found = parsed.find((b: any) => b.id === id);
+        }
+      }
+
       if (found) {
         setBooking(found);
-        calculateLateFee(found, savedRules ? JSON.parse(savedRules) : { tolerance: 15, hourlyRate: 20000 });
+        calculateLateFee(found, rules);
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    loadBookingData();
   }, [id]);
 
   const calculateLateFee = (bookData: any, rules: any) => {
@@ -58,11 +83,36 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const finalDamageFee = parseInt(manualDamageFee.replace(/\D/g, '')) || 0;
     const totalDenda = autoLateFee + finalDamageFee;
+    const currentPrice = Number(booking?.totalPrice) || 0;
+    const updatedTotalPrice = currentPrice + totalDenda;
 
-    // 1. Update Booking Status & Inject Fines
+    const finesData = {
+      lateFee: autoLateFee,
+      damageFee: finalDamageFee,
+      damageDesc: damageDesc,
+      total: totalDenda
+    };
+
+    // 1. Update Firestore
+    try {
+      if (id && typeof id === 'string') {
+        await updateDoc(doc(db, 'bookings', id), {
+          status: 'Selesai',
+          statusColor: 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20',
+          needAction: false,
+          fines: finesData,
+          totalPrice: updatedTotalPrice,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update booking to Selesai in Firestore:', err);
+    }
+
+    // 2. Update localStorage
     const savedBookings = localStorage.getItem('playbox_mock_bookings');
     if (savedBookings) {
       let parsedBookings = JSON.parse(savedBookings);
@@ -71,12 +121,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           return {
             ...b,
             status: 'Selesai',
-            fines: {
-              lateFee: autoLateFee,
-              damageFee: finalDamageFee,
-              damageDesc: damageDesc,
-              total: totalDenda
-            }
+            statusColor: 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20',
+            fines: finesData,
+            totalPrice: updatedTotalPrice
           };
         }
         return b;
@@ -84,13 +131,13 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       localStorage.setItem('playbox_mock_bookings', JSON.stringify(parsedBookings));
     }
 
-    // 2. Release Unit to Ready
+    // 3. Release Unit to Ready
     if (booking?.unitId) {
       const savedUnits = localStorage.getItem('playbox_mock_units');
       if (savedUnits) {
         let parsedUnits = JSON.parse(savedUnits);
         parsedUnits = parsedUnits.map((u: any) => {
-          if (u.id === booking.unitId) {
+          if (u.id === booking.unitId || u.name === booking.unit) {
             return { ...u, status: 'Ready' };
           }
           return u;

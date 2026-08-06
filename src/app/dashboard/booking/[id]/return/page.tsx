@@ -1,10 +1,13 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function ReturnCheck() {
   const { id } = useParams();
   const router = useRouter();
+  const [bookingData, setBookingData] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
 
   // Fine states
@@ -14,20 +17,40 @@ export default function ReturnCheck() {
   const [internalFine, setInternalFine] = useState('');
   const [notes, setNotes] = useState('');
   const [proofPhotos, setProofPhotos] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
-    const savedUnits = localStorage.getItem('playbox_mock_units');
-    
-    if (savedBookings && savedUnits) {
-      const bookings = JSON.parse(savedBookings);
-      const booking = bookings.find((b: any) => b.id === id);
+    const loadData = async () => {
+      let b: any = null;
       
-      if (booking && booking.unitId) {
-        // Calculate late hours
+      // 1. Fetch from Firestore
+      try {
+        if (id && typeof id === 'string') {
+          const docRef = doc(db, 'bookings', id);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            b = { ...snap.data(), id: snap.id };
+          }
+        }
+      } catch (err) {
+        console.warn('Firestore getDoc fallback:', err);
+      }
+
+      // 2. Fallback to localStorage
+      if (!b) {
+        const savedBookings = localStorage.getItem('playbox_mock_bookings');
+        if (savedBookings) {
+          const bookings = JSON.parse(savedBookings);
+          b = bookings.find((item: any) => item.id === id);
+        }
+      }
+
+      if (b) {
+        setBookingData(b);
+
         // Calculate late hours using isoEnd or endTime
         try {
-          const endStr = booking.isoEnd || booking.endTime;
+          const endStr = b.isoEnd || b.endTime;
           if (endStr) {
             const endDate = new Date(endStr);
             const now = new Date();
@@ -41,32 +64,35 @@ export default function ReturnCheck() {
           console.error(e);
         }
 
-        const units = JSON.parse(savedUnits);
-        const unit = units.find((u: any) => u.id === booking.unitId);
-        
-        if (unit && unit.specs) {
-          const dynamicItems = [
-            { id: 0, name: `Console ${unit.name}`, status: 'Lengkap' },
-            ...unit.specs.map((spec: string, idx: number) => ({
-              id: idx + 1,
-              name: spec,
-              status: 'Lengkap'
-            }))
-          ];
-
-          setItems(dynamicItems);
-          return;
+        // Setup unit specs checklist
+        const savedUnits = localStorage.getItem('playbox_mock_units');
+        if (savedUnits) {
+          const units = JSON.parse(savedUnits);
+          const unit = units.find((u: any) => u.id === b.unitId || u.name === b.unit);
+          if (unit && unit.specs) {
+            setItems([
+              { id: 0, name: `Console ${unit.name}`, status: 'Lengkap' },
+              ...unit.specs.map((spec: string, idx: number) => ({
+                id: idx + 1,
+                name: spec,
+                status: 'Lengkap'
+              }))
+            ]);
+            return;
+          }
         }
       }
-    }
-    
-    // Fallback
-    setItems([
-      { id: 1, name: 'Console PS5 Disc Edition', status: 'Lengkap' },
-      { id: 2, name: '2x DualSense Controller', status: 'Lengkap' },
-      { id: 3, name: 'Kabel HDMI 2.1', status: 'Lengkap' },
-      { id: 4, name: 'Kabel Power', status: 'Lengkap' },
-    ]);
+
+      // Default checklist
+      setItems([
+        { id: 1, name: 'Console PS5 Disc Edition', status: 'Lengkap' },
+        { id: 2, name: '2x DualSense Controller', status: 'Lengkap' },
+        { id: 3, name: 'Kabel HDMI 2.1', status: 'Lengkap' },
+        { id: 4, name: 'Kabel Power', status: 'Lengkap' },
+      ]);
+    };
+
+    loadData();
   }, [id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,58 +116,78 @@ export default function ReturnCheck() {
 
   const allComplete = items.every(i => i.status === 'Lengkap');
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    setIsSubmitting(true);
+    const totalLateFine = lateHours * lateFinePerHour;
+    const totalDamageFine = Number(damageFine) || 0;
+    const totalInternalFine = Number(internalFine) || 0;
+    const currentPrice = Number(bookingData?.totalPrice) || 0;
+    const updatedTotalPrice = currentPrice + totalLateFine + totalDamageFine + totalInternalFine;
+
+    const finesData = {
+      lateHours,
+      lateFinePerHour,
+      totalLateFine,
+      totalDamageFine,
+      totalInternalFine,
+      notes,
+      proofPhotos
+    };
+
+    // 1. Update Firestore
+    try {
+      if (id && typeof id === 'string') {
+        await updateDoc(doc(db, 'bookings', id), {
+          status: 'Selesai',
+          statusColor: 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20',
+          needAction: false,
+          fines: finesData,
+          totalPrice: updatedTotalPrice,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update booking status in Firestore:', err);
+    }
+
+    // 2. Update localStorage
     const savedBookings = localStorage.getItem('playbox_mock_bookings');
     const savedUnits = localStorage.getItem('playbox_mock_units');
     
-    if (savedBookings && savedUnits) {
+    if (savedBookings) {
       let bookings = JSON.parse(savedBookings);
-      let units = JSON.parse(savedUnits);
-      
       const bookingIndex = bookings.findIndex((b: any) => b.id === id);
       if (bookingIndex !== -1) {
-        const unitId = bookings[bookingIndex].unitId;
-        
-        // Update unit menjadi Ready
-        units = units.map((u: any) => {
-          if (u.id === unitId) {
-            return {
-              ...u,
-              status: 'Ready',
-              statusColor: 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20'
-            };
-          }
-          return u;
-        });
-        
-        // Update booking fines
-        const totalLateFine = lateHours * lateFinePerHour;
-        const totalDamageFine = Number(damageFine) || 0;
-        const totalInternalFine = Number(internalFine) || 0;
-
         bookings[bookingIndex] = {
           ...bookings[bookingIndex],
           status: 'Selesai',
           statusColor: 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20',
-          fines: {
-            lateHours,
-            lateFinePerHour,
-            totalLateFine,
-            totalDamageFine,
-            totalInternalFine,
-            notes,
-            proofPhotos
-          },
-          totalPrice: bookings[bookingIndex].totalPrice + totalLateFine + totalDamageFine + totalInternalFine
+          needAction: false,
+          fines: finesData,
+          totalPrice: updatedTotalPrice
         };
-        
-        localStorage.setItem('playbox_mock_units', JSON.stringify(units));
         localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
       }
     }
-    
-    alert("Pengecekan selesai! Data denda (jika ada) telah ditambahkan ke invoice.");
-    router.push(`/dashboard/booking/${id}/timeline`); // Back to timeline
+
+    if (savedUnits && bookingData?.unitId) {
+      let units = JSON.parse(savedUnits);
+      units = units.map((u: any) => {
+        if (u.id === bookingData.unitId || u.name === bookingData.unit) {
+          return {
+            ...u,
+            status: 'Ready',
+            statusColor: 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20'
+          };
+        }
+        return u;
+      });
+      localStorage.setItem('playbox_mock_units', JSON.stringify(units));
+    }
+
+    setIsSubmitting(false);
+    alert("Pengecekan selesai! Status booking telah diubah menjadi Selesai.");
+    router.push(`/dashboard/booking/${id}/timeline`);
   };
 
   return (
