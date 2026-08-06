@@ -71,15 +71,37 @@ export default function PengaturanTokoPage() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Ukuran file logo maksimal 2MB.');
-        return;
-      }
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
-        const base64 = uploadEvent.target?.result as string;
-        setLogo(base64);
-        setIsSaved(false);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const MAX_SIZE = 400;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          setLogo(compressedBase64);
+          setIsSaved(false);
+        };
+        img.src = uploadEvent.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -107,15 +129,16 @@ export default function PengaturanTokoPage() {
     // 1. Save to Cloud Firestore
     try {
       await setDoc(doc(db, 'settings', 'shop'), settingsData);
-    } catch (err) {
+      
+      // 2. Save to localStorage only if Firestore succeeds
+      localStorage.setItem('playbox_shop_settings', JSON.stringify(settingsData));
+      setSlug(finalSlug);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err: any) {
       console.error('Failed saving shop settings to Firestore:', err);
+      alert('Gagal menyimpan profil: ' + err.message);
     }
-
-    // 2. Save to localStorage
-    localStorage.setItem('playbox_shop_settings', JSON.stringify(settingsData));
-    setSlug(finalSlug);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
   };
 
   const storeUrl = `${domain}/store/${slug || 'nama-toko'}`;
