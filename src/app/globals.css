@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #03040B; /* Slightly deeper black */
+  --color-surface: #0E1221;
+  --color-surface-elevated: #161C33;
+  --color-accent: #E2178E; /* More vibrant pink/magenta */
+  --color-accent-hover: #F0289D;
+  --color-accent-gradient-start: #5912C0;
+  --color-accent-gradient-end: #CC1288;
+  --color-status-ready: #23C552;
+  --color-status-disewa: #E2178E;
+  --color-status-maintenance: #F5A623;
+  --color-profit-positive: #23C552;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #9BA1B0;
+  
+  --shadow-subtle: 0 4px 20px -2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-floating: 0 12px 40px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-button: 0 2px 8px -2px rgba(226, 23, 142, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-150%) skewX(12deg); }
+  100% { transform: translateX(350%) skewX(12deg); }
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  
+  --color-playbox-bg: var(--color-bg);
+  --color-playbox-surface: var(--color-surface);
+  --color-playbox-surface-elevated: var(--color-surface-elevated);
+  --color-playbox-accent: var(--color-accent);
+  --color-playbox-accent-hover: var(--color-accent-hover);
+  --color-playbox-gradient-start: var(--color-accent-gradient-start);
+  --color-playbox-gradient-end: var(--color-accent-gradient-end);
+  --color-playbox-ready: var(--color-status-ready);
+  --color-playbox-disewa: var(--color-status-disewa);
+  --color-playbox-maintenance: var(--color-status-maintenance);
+  --color-playbox-profit: var(--color-profit-positive);
+  --color-playbox-text-primary: var(--color-text-primary);
+  --color-playbox-text-secondary: var(--color-text-secondary);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Hide scrollbars globally */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+/* Premium Component Utilities */
+@layer utilities {
+  .glass-surface {
+    @apply bg-playbox-surface border border-white/5 backdrop-blur-xl shadow-[var(--shadow-subtle)];
+  }
+  .glass-surface-elevated {
+    @apply bg-playbox-surface-elevated border border-white/10 backdrop-blur-xl shadow-[var(--shadow-floating)];
+  }
+  .saas-button {
+    @apply bg-playbox-accent text-white font-medium transition-all duration-200 shadow-[var(--shadow-button)] hover:bg-playbox-accent-hover active:scale-[0.98] hover:-translate-y-[1px];
+  }
+  .saas-button-secondary {
+    @apply bg-white/5 border border-white/10 text-white font-medium transition-all duration-200 hover:bg-white/10 active:scale-[0.98];
+  }
+  .ambient-glow {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(90, 18, 192, 0.08) 0%, rgba(204, 18, 136, 0.05) 30%, rgba(3, 4, 11, 0) 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60;
+  }
+}

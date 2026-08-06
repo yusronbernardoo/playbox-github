@@ -1,0 +1,195 @@
+'use client';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+export default function UnitList() {
+  const router = useRouter();
+  const [role, setRole] = useState('');
+  const [filter, setFilter] = useState('Semua');
+  const [searchQuery, setSearchQuery] = useState('');
+  const filters = ['Semua', 'Ready', 'Disewa', 'Maintenance'];
+
+  const defaultUnits: any[] = [];
+
+  const [units, setUnits] = useState<any[]>([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const filterParam = params.get('filter');
+    if (filterParam && filters.includes(filterParam)) {
+      setFilter(filterParam);
+    }
+
+    const authData = localStorage.getItem('playbox_auth');
+    if (authData) {
+      setRole(JSON.parse(authData).role);
+    }
+
+    const saved = localStorage.getItem('playbox_mock_units');
+    if (saved) {
+      setUnits(JSON.parse(saved));
+    } else {
+      setUnits(defaultUnits);
+      localStorage.setItem('playbox_mock_units', JSON.stringify(defaultUnits));
+    }
+  }, []);
+
+  const filteredUnits = units.filter(u => {
+    const matchFilter = filter === 'Semua' || u.status === filter;
+    const matchSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        u.type.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchFilter && matchSearch;
+  });
+
+  return (
+    <div className="p-4 space-y-6 pb-28 h-full">
+      {/* Header */}
+      <div className="flex justify-between items-center mt-2">
+        <h1 className="text-2xl font-bold tracking-tight">Daftar Unit</h1>
+        {role === 'owner' && (
+          <Link href="/dashboard/unit/new" className="saas-button px-4 py-2 rounded-xl text-sm flex items-center shadow-[0_4px_15px_rgba(226,23,142,0.4)]">
+            <span className="mr-1 text-lg font-light leading-none">+</span> Tambah
+          </Link>
+        )}
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <input 
+          type="text" 
+          placeholder="Cari nama unit atau jenis konsol..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white placeholder-white/40 focus:outline-none focus:border-playbox-accent transition-colors"
+        />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">🔍</span>
+      </div>
+
+      {/* Filter Tabs */}
+      <div>
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide mask-edges">
+          {filters.map(f => (
+            <button 
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                filter === f 
+                  ? 'bg-white text-black shadow-[0_4px_15px_rgba(255,255,255,0.2)]' 
+                  : 'glass-surface text-playbox-text-secondary hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-white/50 px-1 mt-1">Menampilkan {filteredUnits.length} Unit</p>
+      </div>
+
+      {/* Grid Unit */}
+      <div className="grid grid-cols-1 gap-4">
+        {filteredUnits.map(unit => {
+          const content = (
+            <>
+              <div className="w-24 h-24 rounded-2xl overflow-hidden bg-white/5 shrink-0 shadow-inner relative">
+                {/* Fallback pattern / gradient if image fails, but we have url */}
+                <div className="absolute inset-0 bg-gradient-to-br from-black/20 to-black/60 z-10 mix-blend-overlay"></div>
+                <img src={unit.image} alt={unit.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start mb-1">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${unit.statusColor}`}>
+                    {unit.status}
+                  </span>
+                  {role === 'owner' && (
+                    <div className="flex items-center space-x-1.5 opacity-80">
+                      <button 
+                        onClick={(e) => { e.preventDefault(); router.push(`/dashboard/unit/${unit.id}/edit`); }}
+                        className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs hover:bg-playbox-accent hover:text-white transition-colors"
+                        title="Edit"
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          if(confirm('Yakin ingin menghapus unit ini?')) {
+                            const newUnits = units.filter(x => x.id !== unit.id);
+                            setUnits(newUnits);
+                            localStorage.setItem('playbox_mock_units', JSON.stringify(newUnits));
+                          }
+                        }}
+                        className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs hover:bg-red-500 hover:text-white transition-colors"
+                        title="Hapus"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  )}
+                </div>
+              <h3 className="font-bold text-base truncate mt-1.5 text-white/90">{unit.name}</h3>
+              <p className="text-[11px] text-playbox-text-secondary mt-0.5">{unit.type}</p>
+              {(unit.specs?.length > 0 || unit.games?.length > 0) && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {unit.specs?.map((spec: string, idx: number) => (
+                    <span key={`s-${idx}`} className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 border border-white/5">
+                      {spec}
+                    </span>
+                  ))}
+                  {unit.games?.slice(0, 3).map((game: string, idx: number) => (
+                    <span key={`g-${idx}`} className="text-[9px] px-1.5 py-0.5 rounded bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20">
+                      {game}
+                    </span>
+                  ))}
+                  {unit.games?.length > 3 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 border border-white/5">
+                      + {unit.games.length - 3} lainnya
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex justify-between items-end mt-3">
+                <p className="text-sm font-semibold tracking-tight">
+                  {unit.priceTiers && unit.priceTiers.length > 0 ? (
+                    <>
+                      Rp {(unit.priceTiers[0].price || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-playbox-text-secondary">/ {unit.priceTiers[0].durationVal} {unit.priceTiers[0].durationUnit}</span>
+                    </>
+                  ) : (
+                    <>
+                      Rp {(unit.price || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-playbox-text-secondary">/ 24j</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              </div>
+            </>
+          );
+
+          if (role === 'owner') {
+            return (
+              <Link href={`/dashboard/unit/${unit.id}`} key={unit.id} className="glass-surface p-4 rounded-3xl flex items-center space-x-4 group hover:bg-white/5 transition-all duration-300 active:scale-[0.98]">
+                {content}
+              </Link>
+            );
+          } else {
+            return (
+              <div key={unit.id} className="glass-surface p-4 rounded-3xl flex items-center space-x-4 group">
+                {content}
+              </div>
+            );
+          }
+        })}
+
+        {filteredUnits.length === 0 && (
+          <div className="text-center py-16 text-playbox-text-secondary glass-surface rounded-3xl">
+            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 mx-auto">
+              <span className="text-2xl opacity-50">🎮</span>
+            </div>
+            <p className="text-sm font-medium">Tidak ada unit di kategori ini.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
