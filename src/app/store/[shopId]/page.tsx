@@ -35,6 +35,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
   const [displayShopName, setDisplayShopName] = useState<string>('');
+  const [zoomedQris, setZoomedQris] = useState<string | null>(null);
   const [shopProfile, setShopProfile] = useState<{
     brandName?: string;
     phone?: string;
@@ -43,6 +44,47 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     bio?: string;
     logo?: string;
   }>({});
+
+  // Helper to compress image down to ~30-50KB using Canvas
+  const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
 
   useEffect(() => {
     // 1. Real-time Shop Profile Listener
@@ -87,40 +129,58 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       }
     });
 
-    // 3. Payment Methods
-    const savedPayments = localStorage.getItem('playbox_payments');
-    if (savedPayments) {
-      const parsed = JSON.parse(savedPayments);
-      setPaymentMethods(parsed.filter((p: any) => p.active));
-    }
+    // 3. Real-time Payment Methods Listener
+    const unsubscribePayments = onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list)) {
+          setPaymentMethods(data.list.filter((p: any) => p.active));
+          localStorage.setItem('playbox_payments', JSON.stringify(data.list));
+          return;
+        }
+      }
+
+      const savedPayments = localStorage.getItem('playbox_payments');
+      if (savedPayments) {
+        try {
+          const parsed = JSON.parse(savedPayments);
+          setPaymentMethods(parsed.filter((p: any) => p.active));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
 
     return () => {
       unsubscribeShop();
       unsubscribeUnits();
+      unsubscribePayments();
     };
   }, [unwrappedParams.shopId]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setKtpFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setKtpDataUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file, 900, 900, 0.8);
+        setKtpDataUrl(compressed);
+      } catch (err) {
+        console.error('Error compressing KTP:', err);
+      }
     }
   };
 
-  const handlePaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePaymentProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setPaymentProofFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPaymentProofDataUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file, 900, 900, 0.8);
+        setPaymentProofDataUrl(compressed);
+      } catch (err) {
+        console.error('Error compressing proof:', err);
+      }
     }
   };
 
@@ -636,15 +696,56 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                   {/* Pembayaran Toko jika Ambil di Toko */}
                   {!requireDelivery && paymentMethods.length > 0 && (
                     <div className="pt-3 border-t border-white/10 space-y-3">
-                      <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider">Transfer Pembayaran ke:</label>
-                      <div className="space-y-2">
+                      <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider">Transfer Pembayaran / QRIS Toko:</label>
+                      <div className="space-y-2.5">
                         {paymentMethods.map(p => (
-                          <div key={p.id} className="p-3 bg-black/40 border border-white/10 rounded-xl flex justify-between items-center text-xs">
-                            <div>
-                              <p className="font-bold text-white">{p.name}</p>
-                              <p className="text-[10px] text-white/50">a.n {p.owner}</p>
+                          <div key={p.id} className="p-3 bg-black/40 border border-white/10 rounded-2xl flex justify-between items-center text-xs gap-3">
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                              {p.type === 'QRIS' && p.qrisImage ? (
+                                <div 
+                                  onClick={() => setZoomedQris(p.qrisImage)}
+                                  className="w-12 h-12 bg-white rounded-xl p-1 flex-shrink-0 cursor-pointer shadow hover:scale-105 transition-transform"
+                                >
+                                  <img src={p.qrisImage} alt="QRIS" className="w-full h-full object-contain" />
+                                </div>
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base flex-shrink-0">
+                                  {p.type === 'E-Wallet' ? '📱' : '🏦'}
+                                </div>
+                              )}
+                              <div className="truncate">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-bold text-white truncate">{p.name}</p>
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${p.type === 'QRIS' ? 'bg-[#25D366]/20 text-[#25D366]' : 'bg-white/10 text-white/60'}`}>{p.type}</span>
+                                </div>
+                                <p className="text-[10px] text-white/50 truncate">a.n {p.owner}</p>
+                              </div>
                             </div>
-                            <span className="font-mono font-bold text-playbox-accent bg-playbox-accent/10 px-2 py-1 rounded border border-playbox-accent/20">{p.account}</span>
+
+                            {p.type === 'QRIS' && p.qrisImage ? (
+                              <button 
+                                type="button"
+                                onClick={() => setZoomedQris(p.qrisImage)}
+                                className="px-3 py-1.5 bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] rounded-xl font-bold text-[10px] flex items-center gap-1 hover:bg-[#25D366]/30 transition-all flex-shrink-0"
+                              >
+                                🔍 Scan QRIS
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <span className="font-mono font-bold text-playbox-accent bg-playbox-accent/10 px-2 py-1 rounded border border-playbox-accent/20 text-xs select-all">{p.account}</span>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(p.account);
+                                    alert(`Nomor rekening ${p.name} (${p.account}) berhasil disalin!`);
+                                  }}
+                                  title="Salin Nomor"
+                                  className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-[10px] transition-colors"
+                                >
+                                  📋
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -655,7 +756,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                         <div className="relative">
                           <input 
                             type="file" 
-                            accept="image/*"
+                            accept="image/*" 
                             onChange={handlePaymentProofUpload}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                           />
@@ -681,6 +782,30 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                 </form>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* QRIS Zoom Modal for Customer */}
+      {zoomedQris && (
+        <div 
+          onClick={() => setZoomedQris(null)}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in duration-200"
+        >
+          <div className="bg-white p-5 rounded-3xl max-w-sm w-full shadow-2xl text-center space-y-4" onClick={e => e.stopPropagation()}>
+            <div>
+              <h3 className="text-black font-extrabold text-base">Barcode QRIS Pembayaran</h3>
+              <p className="text-xs text-black/60 mt-0.5">Scan langsung melalui BCA, GoPay, DANA, OVO, ShopeePay</p>
+            </div>
+            <div className="w-full aspect-square bg-white rounded-2xl overflow-hidden flex items-center justify-center p-2 border border-black/10 shadow-inner">
+              <img src={zoomedQris} alt="QRIS" className="w-full h-full object-contain" />
+            </div>
+            <button 
+              onClick={() => setZoomedQris(null)}
+              className="w-full py-3 bg-black text-white font-bold rounded-xl text-xs hover:bg-zinc-800 transition-all shadow-md"
+            >
+              Tutup QRIS
+            </button>
           </div>
         </div>
       )}
