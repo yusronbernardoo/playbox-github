@@ -158,7 +158,7 @@ export default function EditUnit() {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-28 relative">
+    <div className="p-4 max-w-xl mx-auto space-y-6 pb-28 relative">
       <div className="ambient-glow"></div>
 
       {/* Header */}

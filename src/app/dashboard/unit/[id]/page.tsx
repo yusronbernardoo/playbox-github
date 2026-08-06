@@ -68,7 +68,7 @@ export default function UnitDetail() {
   if (!unit) return <div className="p-8 text-center text-white/50">Memuat...</div>;
 
   return (
-    <div className="pb-28 relative">
+    <div className="pb-28 relative max-w-xl mx-auto">
       <div className="ambient-glow"></div>
 
       {/* Hero Image */}
@@ -97,13 +97,19 @@ export default function UnitDetail() {
           <div className="mt-6 border-t border-white/5 pt-5">
             <p className="text-xs text-playbox-text-secondary uppercase tracking-wider mb-2">Daftar Paket Harga Sewa</p>
             {unit.priceTiers && unit.priceTiers.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {unit.priceTiers.map((t: any, idx: number) => (
-                  <div key={idx} className="bg-white/5 p-3 rounded-2xl border border-white/5 flex items-center justify-between">
-                    <span className="text-xs text-white/80 font-semibold">⏱️ {t.durationVal} {t.durationUnit || 'Jam'}</span>
-                    <span className="text-xs font-black text-playbox-ready">Rp {Number(t.price || 0).toLocaleString('id-ID')}</span>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2">
+                {unit.priceTiers.map((t: any, idx: number) => {
+                  const unitIcon = t.durationUnit === 'Bulan' ? '🌙' : t.durationUnit === 'Minggu' ? '📆' : t.durationUnit === 'Hari' ? '📅' : '⏱️';
+                  return (
+                    <div key={idx} className="bg-white/5 p-3.5 rounded-2xl border border-white/10 flex items-center justify-between">
+                      <span className="text-xs text-white/90 font-bold flex items-center gap-1.5">
+                        <span>{unitIcon}</span>
+                        <span>{t.durationVal} {t.durationUnit || 'Jam'}</span>
+                      </span>
+                      <span className="text-xs font-black text-playbox-ready">Rp {Number(t.price || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-2xl font-bold text-white tracking-tight">
