@@ -4,6 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "PlayBox OS - Sistem Manajemen Rental PS",
   description: "Aplikasi Operasional & Kasir Rental PlayStation",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "PlayBox OS",
+  },
 };
 
 export const viewport: Viewport = {
