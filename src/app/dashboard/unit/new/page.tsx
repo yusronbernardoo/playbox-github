@@ -184,81 +184,104 @@ export default function UnitNew() {
 
         {/* Harga Sewa */}
         <div className="glass-surface p-6 rounded-3xl space-y-4 relative z-10">
-          <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">Harga Sewa Per Durasi</h2>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest">Harga Sewa Per Durasi</h2>
+            <span className="text-[11px] text-white/40">{priceTiers.length} Paket Aktif</span>
+          </div>
           
-          {priceTiers.map((tier, idx) => (
-            <div key={idx} className="flex space-x-2 items-center">
-              <input 
-                type="number"
-                min="1"
-                value={tier.durationVal}
-                onChange={e => handleTierChange(idx, 'durationVal', parseInt(e.target.value) || '')}
-                placeholder="Angka"
-                className="w-20 p-4 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 text-center font-bold"
-                required
-              />
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setOpenUnitTierDropdown(openUnitTierDropdown === idx ? null : idx)}
-                  className={`w-28 p-4 rounded-xl bg-black/30 border text-white text-sm flex items-center justify-between transition-all font-bold ${
-                    openUnitTierDropdown === idx ? 'border-playbox-accent shadow-[0_0_12px_rgba(226,23,142,0.35)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <span className="truncate">{tier.durationUnit || 'Jam'}</span>
-                  <span className={`text-[9px] text-playbox-accent transition-transform duration-300 ${openUnitTierDropdown === idx ? 'rotate-180' : 'opacity-60'}`}>▼</span>
-                </button>
+          <div className="space-y-3">
+            {priceTiers.map((tier, idx) => (
+              <div key={idx} className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-3 relative group hover:border-white/20 transition-all">
+                {/* Baris 1: Durasi, Satuan, dan Tombol Hapus */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <div className="relative">
+                      <input 
+                        type="number"
+                        min="1"
+                        value={tier.durationVal}
+                        onChange={e => handleTierChange(idx, 'durationVal', parseInt(e.target.value) || '')}
+                        placeholder="1"
+                        className="w-20 p-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 text-center font-bold"
+                        required
+                      />
+                    </div>
+                    <div className="relative flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setOpenUnitTierDropdown(openUnitTierDropdown === idx ? null : idx)}
+                        className={`w-full p-3 rounded-xl bg-black/40 border text-white text-sm flex items-center justify-between transition-all font-bold ${
+                          openUnitTierDropdown === idx ? 'border-playbox-accent shadow-[0_0_12px_rgba(226,23,142,0.35)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="truncate">{tier.durationUnit || 'Jam'}</span>
+                        <span className={`text-[9px] text-playbox-accent transition-transform duration-300 ${openUnitTierDropdown === idx ? 'rotate-180' : 'opacity-60'}`}>▼</span>
+                      </button>
 
-                {openUnitTierDropdown === idx && (
-                  <div className="absolute top-full left-0 w-36 mt-2 bg-[#0D1122]/95 border border-white/15 rounded-2xl overflow-hidden shadow-2xl z-50 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
-                    {[
-                      { label: 'Jam', icon: '⏱️' },
-                      { label: 'Hari', icon: '📅' },
-                      { label: 'Minggu', icon: '📆' },
-                      { label: 'Bulan', icon: '🌙' }
-                    ].map((u) => {
-                      const isSelected = (tier.durationUnit || 'Jam') === u.label;
-                      return (
-                        <div
-                          key={u.label}
-                          onClick={() => {
-                            handleTierChange(idx, 'durationUnit', u.label);
-                            setOpenUnitTierDropdown(null);
-                          }}
-                          className={`p-3 text-xs cursor-pointer transition-colors flex items-center justify-between ${
-                            isSelected ? 'bg-playbox-accent/15 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <span>{u.icon}</span>
-                            <span>{u.label}</span>
-                          </span>
-                          {isSelected && <span className="text-[10px] text-playbox-accent font-black">✓</span>}
+                      {openUnitTierDropdown === idx && (
+                        <div className="absolute top-full left-0 w-full mt-2 bg-[#0D1122]/95 border border-white/15 rounded-2xl overflow-hidden shadow-2xl z-50 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
+                          {[
+                            { label: 'Jam', icon: '⏱️' },
+                            { label: 'Hari', icon: '📅' },
+                            { label: 'Minggu', icon: '📆' },
+                            { label: 'Bulan', icon: '🌙' }
+                          ].map((u) => {
+                            const isSelected = (tier.durationUnit || 'Jam') === u.label;
+                            return (
+                              <div
+                                key={u.label}
+                                onClick={() => {
+                                  handleTierChange(idx, 'durationUnit', u.label);
+                                  setOpenUnitTierDropdown(null);
+                                }}
+                                className={`p-3 text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                                  isSelected ? 'bg-playbox-accent/15 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>{u.icon}</span>
+                                  <span>{u.label}</span>
+                                </span>
+                                {isSelected && <span className="text-[10px] text-playbox-accent font-black">✓</span>}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      )}
+                    </div>
                   </div>
-                )}
+
+                  {priceTiers.length > 1 && (
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveTier(idx)} 
+                      className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center transition-colors text-lg flex-shrink-0 font-bold"
+                      title="Hapus Paket"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Baris 2: Input Nominal Harga Full Width */}
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm font-semibold">Rp</span>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={tier.price ? Number(tier.price).toLocaleString('id-ID') : ''}
+                    onChange={e => handleTierChange(idx, 'price', e.target.value)}
+                    placeholder="Contoh: 150.000"
+                    className="w-full p-3.5 pl-12 rounded-xl bg-black/40 border border-white/10 text-white text-base focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 font-black tracking-wide"
+                    required
+                  />
+                </div>
               </div>
-              <div className="flex-1 relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm">Rp</span>
-                <input 
-                  type="text" 
-                  inputMode="numeric"
-                  value={tier.price ? Number(tier.price).toLocaleString('id-ID') : ''}
-                  onChange={e => handleTierChange(idx, 'price', e.target.value)}
-                  placeholder="Mis: 150.000"
-                  className="w-full p-4 pl-12 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 font-bold"
-                  required
-                />
-              </div>
-              {priceTiers.length > 1 && (
-                <button type="button" onClick={() => handleRemoveTier(idx)} className="text-red-400 p-3 hover:bg-white/5 rounded-xl transition-colors">×</button>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={handleAddTier} className="text-xs font-bold text-playbox-accent bg-playbox-accent/10 px-4 py-2 rounded-lg hover:bg-playbox-accent/20 transition-colors mt-2">
-            + Tambah Durasi
+            ))}
+          </div>
+
+          <button type="button" onClick={handleAddTier} className="w-full py-3.5 rounded-xl text-xs font-bold text-playbox-accent bg-playbox-accent/10 border border-playbox-accent/20 hover:bg-playbox-accent/20 transition-all flex items-center justify-center gap-2">
+            <span>+</span> Tambah Paket Durasi Baru
           </button>
         </div>
 

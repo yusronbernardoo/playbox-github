@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot } from 'firebase/firestore';
 
 export default function NewBooking() {
   const router = useRouter();
@@ -14,8 +14,9 @@ export default function NewBooking() {
 
   // Form State
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const [selectedTierIndex, setSelectedTierIndex] = useState<number>(0);
   
-  const [schedule, setSchedule] = useState({ date: '', time: '', duration: 24, durationType: 'Jam' as 'Jam' | 'Hari' | 'Minggu' });
+  const [schedule, setSchedule] = useState({ date: '', time: '', duration: 24, durationType: 'Jam' as 'Jam' | 'Hari' | 'Minggu' | 'Bulan' });
   
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '', requireDelivery: false, instagram: '', emergencyPhone: '' });
   const [deliveryFee, setDeliveryFee] = useState('');
@@ -30,7 +31,6 @@ export default function NewBooking() {
   const [payment, setPayment] = useState({ method: 'Transfer Bank', deposit: '', cashReceived: '' });
   
   // Custom Dropdown States
-  const [isDurationOpen, setIsDurationOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [tempTime, setTempTime] = useState('08:00');
@@ -39,12 +39,26 @@ export default function NewBooking() {
   const [savedPaymentMethods, setSavedPaymentMethods] = useState<any[]>([]);
 
   useEffect(() => {
+    // 1. Fallback local units
     const saved = localStorage.getItem('playbox_mock_units');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      // Only show Ready units
-      setAvailableUnits(parsed.filter((u: any) => u.status === 'Ready'));
+      try {
+        const parsed = JSON.parse(saved);
+        setAvailableUnits(parsed.filter((u: any) => u.status === 'Ready'));
+      } catch {}
     }
+
+    // 2. Real-time Firestore units listener
+    const unsubUnits = onSnapshot(collection(db, 'units'), (snap) => {
+      if (!snap.empty) {
+        const cloudUnits: any[] = [];
+        snap.forEach(d => {
+          cloudUnits.push({ ...d.data(), id: d.id });
+        });
+        localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+        setAvailableUnits(cloudUnits.filter(u => u.status === 'Ready'));
+      }
+    });
 
     const savedRules = localStorage.getItem('playbox_delivery_rules');
     if (savedRules) {
@@ -64,6 +78,8 @@ export default function NewBooking() {
     if (savedPayments) {
       setSavedPaymentMethods(JSON.parse(savedPayments).filter((p: any) => p.active));
     }
+
+    return () => unsubUnits();
   }, []);
 
   useEffect(() => {
@@ -101,6 +117,14 @@ export default function NewBooking() {
   }, [deliveryDistance, deliveryRules]);
 
   const selectedUnit = availableUnits.find(u => u.id === selectedUnitId);
+
+  const getTierHours = (val: number | string, unit: string) => {
+    const num = Number(val) || 0;
+    if (unit === 'Bulan') return num * 720;
+    if (unit === 'Minggu') return num * 168;
+    if (unit === 'Hari') return num * 24;
+    return num; // Jam
+  };
 
   const handleNext = () => {
     if (step === 1) {
@@ -147,23 +171,19 @@ export default function NewBooking() {
   const calculateBasePrice = () => {
     if (!selectedUnit) return 0;
     
-    // Total hours requested by user
-    let totalHours = schedule.duration;
-    if (schedule.durationType === 'Hari') totalHours = schedule.duration * 24;
-    
-    // Look for exact tier based on total hours
-    if (selectedUnit.priceTiers) {
-      const exactTier = selectedUnit.priceTiers.find((t: any) => t.durationVal === totalHours);
-      if (exactTier && exactTier.price) {
-        return exactTier.price;
+    if (selectedUnit.priceTiers && selectedUnit.priceTiers.length > 0) {
+      if (selectedTierIndex !== null && selectedUnit.priceTiers[selectedTierIndex]) {
+        return Number(selectedUnit.priceTiers[selectedTierIndex].price) || 0;
       }
+      const match = selectedUnit.priceTiers.find((t: any) => 
+        Number(t.durationVal) === Number(schedule.duration) && 
+        (t.durationUnit || 'Jam') === schedule.durationType
+      );
+      if (match && match.price) return Number(match.price);
+      return Number(selectedUnit.priceTiers[0].price) || 0;
     }
     
-    // Fallback prorate based on the first/default price (which is usually the 24h price)
-    const baseDuration = selectedUnit.priceTiers?.[0]?.durationVal || 24;
-    const basePrice = selectedUnit.priceTiers?.[0]?.price || selectedUnit.price || 0;
-
-    return (basePrice / baseDuration) * totalHours;
+    return Number(selectedUnit.price) || 0;
   };
 
   const calculateTotal = () => {
@@ -182,9 +202,7 @@ export default function NewBooking() {
       const total = calculateTotal();
       
       // Calculate Expiry hour logic for timeline rendering
-      let totalHours = schedule.duration;
-      if (schedule.durationType === 'Hari') totalHours = schedule.duration * 24;
-      if (schedule.durationType === 'Minggu') totalHours = schedule.duration * 24 * 7;
+      const totalHours = getTierHours(schedule.duration, schedule.durationType);
 
       let startDateFormatted = schedule.date;
       let endDateFormatted = '';
@@ -299,7 +317,7 @@ export default function NewBooking() {
 
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col relative z-10">
         
-        {/* Step 1: Unit & Paket */}
+        {/* Step 1: Unit */}
         {step === 1 && (
           <div className="flex-1 space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-4">1. Pilih Unit</h2>
@@ -310,75 +328,121 @@ export default function NewBooking() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 pb-4">
-                {availableUnits.map(u => (
-                  <div 
-                    key={u.id}
-                    onClick={() => setSelectedUnitId(u.id)}
-                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
-                      selectedUnitId === u.id 
-                        ? 'border-playbox-accent bg-playbox-accent/10 shadow-[0_4px_20px_rgba(226,23,142,0.15)] scale-[1.02]' 
-                        : 'border-white/5 bg-black/20 hover:bg-white/5 hover:border-white/10'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-sm text-white">{u.name}</h3>
-                        <p className="text-[11px] text-playbox-text-secondary mt-1 mb-2">{u.type}</p>
-                        <p className="text-sm font-semibold tracking-tight text-white/90">
-                          {u.priceTiers && u.priceTiers.length > 0 ? (
-                            <>
-                              Rp {(u.priceTiers[0].price || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-playbox-text-secondary">/ {u.priceTiers[0].durationVal} {u.priceTiers[0].durationUnit}</span>
-                            </>
-                          ) : (
-                            <>
-                              Rp {(u.price || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-playbox-text-secondary">/ 24j</span>
-                            </>
-                          )}
-                        </p>
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedUnitId === u.id ? 'border-playbox-accent' : 'border-white/20'}`}>
-                        {selectedUnitId === u.id && <div className="w-2.5 h-2.5 rounded-full bg-playbox-accent"></div>}
+                {availableUnits.map(u => {
+                  const isSelected = selectedUnitId === u.id;
+                  const tiers = u.priceTiers && u.priceTiers.length > 0 ? u.priceTiers : [{ durationVal: 24, durationUnit: 'Jam', price: u.price || 0 }];
+                  return (
+                    <div 
+                      key={u.id}
+                      onClick={() => {
+                        setSelectedUnitId(u.id);
+                        setSelectedTierIndex(0);
+                        if (tiers[0]) {
+                          setSchedule(prev => ({
+                            ...prev,
+                            duration: tiers[0].durationVal,
+                            durationType: tiers[0].durationUnit || 'Jam'
+                          }));
+                        }
+                      }}
+                      className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'border-playbox-accent bg-playbox-accent/10 shadow-[0_4px_20px_rgba(226,23,142,0.2)] scale-[1.01]' 
+                          : 'border-white/5 bg-black/20 hover:bg-white/5 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <h3 className="font-bold text-sm text-white truncate">{u.name}</h3>
+                          <p className="text-[11px] text-playbox-text-secondary mt-0.5 mb-2">{u.type}</p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {tiers.map((t: any, i: number) => (
+                              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-white/80 font-medium">
+                                {t.durationVal} {t.durationUnit || 'Jam'}: <strong className="text-playbox-accent ml-1">Rp {(Number(t.price) || 0).toLocaleString('id-ID')}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 mt-1 ${isSelected ? 'border-playbox-accent' : 'border-white/20'}`}>
+                          {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-playbox-accent"></div>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* Step 2: Jadwal */}
+        {/* Step 2: Jadwal & Paket Durasi */}
         {step === 2 && (
           <div className="flex-1 space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-            <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">2. Jadwal & Durasi Sewa</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest">2. Jadwal & Paket Durasi Sewa</h2>
+              {selectedUnit && <span className="text-[11px] text-playbox-accent font-semibold">{selectedUnit.name}</span>}
+            </div>
             
-            <div className="flex space-x-2">
-              {['Jam', 'Hari'].map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setSchedule({...schedule, durationType: t as any})}
-                  className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${schedule.durationType === t ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)]' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-                >
-                  {t}
-                </button>
-              ))}
+            {/* Pilihan Paket Durasi Sewa dari Unit */}
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider">
+                Pilih Paket Durasi Sewa
+              </label>
+              
+              {(() => {
+                const tiers = selectedUnit?.priceTiers && selectedUnit.priceTiers.length > 0
+                  ? selectedUnit.priceTiers
+                  : [{ durationVal: 24, durationUnit: 'Jam', price: selectedUnit?.price || 0 }];
+                
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {tiers.map((tier: any, idx: number) => {
+                      const isSelected = selectedTierIndex === idx;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setSelectedTierIndex(idx);
+                            setSchedule(prev => ({
+                              ...prev,
+                              duration: tier.durationVal,
+                              durationType: tier.durationUnit || 'Jam'
+                            }));
+                          }}
+                          className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                            isSelected 
+                              ? 'border-playbox-accent bg-playbox-accent/15 shadow-[0_4px_20px_rgba(226,23,142,0.25)] ring-1 ring-playbox-accent' 
+                              : 'border-white/10 bg-black/30 hover:border-white/20 hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
+                              isSelected ? 'bg-playbox-accent text-white shadow-[0_0_12px_rgba(226,23,142,0.5)]' : 'bg-white/5 text-white/60'
+                            }`}>
+                              {tier.durationUnit === 'Bulan' ? '🌙' : tier.durationUnit === 'Minggu' ? '📆' : tier.durationUnit === 'Hari' ? '📅' : '⏱️'}
+                            </div>
+                            <div>
+                              <div className="font-bold text-sm text-white">
+                                {tier.durationVal} {tier.durationUnit || 'Jam'}
+                              </div>
+                              <div className="text-xs font-bold text-playbox-accent mt-0.5">
+                                Rp {(Number(tier.price) || 0).toLocaleString('id-ID')}
+                              </div>
+                            </div>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-playbox-accent' : 'border-white/20'}`}>
+                            {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-playbox-accent"></div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
-            <div className="glass-surface p-6 rounded-3xl space-y-4">
-              <div>
-                <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Durasi (Angka)</label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    value={schedule.duration}
-                    onChange={e => setSchedule({...schedule, duration: parseInt(e.target.value) || 0})}
-                    className="w-full p-4 pr-16 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-playbox-text-secondary font-medium">{schedule.durationType}</span>
-                </div>
-              </div>
-
+            {/* Jadwal Mulai */}
+            <div className="glass-surface p-5 rounded-3xl space-y-4">
               <div>
                 <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Tanggal Mulai</label>
                 <div className="relative">
@@ -514,6 +578,7 @@ export default function NewBooking() {
                         </div>
 
                         <button 
+                          type="button"
                           onClick={() => {
                             setSchedule({...schedule, time: tempTime});
                             setIsTimePickerOpen(false);
