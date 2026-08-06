@@ -328,23 +328,23 @@ export default function TimelineBooking() {
             </div>
           )}
 
-          <div className="flex justify-between items-start">
-            <div className="space-y-1.5">
+          <div className="flex justify-between items-start gap-3">
+            <div className="space-y-1.5 min-w-0 flex-1">
               <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Data Klien</p>
-              <p className="text-sm font-bold text-white mb-2">{bookingData.customer}</p>
-              <p className="text-xs text-white/70 flex items-center"><span className="w-4 h-4 mr-1 opacity-50 flex items-center justify-center">📱</span> {bookingData.customerPhone}</p>
-              {bookingData.emergencyPhone && <p className="text-xs text-white/70 flex items-center"><span className="w-4 h-4 mr-1 opacity-50 flex items-center justify-center text-red-400">🚨</span> {bookingData.emergencyPhone}</p>}
-              {bookingData.instagram && <p className="text-xs text-white/70 flex items-center"><span className="w-4 h-4 mr-1 opacity-50 flex items-center justify-center text-blue-400">📸</span> {bookingData.instagram}</p>}
+              <p className="text-sm font-bold text-white mb-2 truncate" title={bookingData.customer}>{bookingData.customer}</p>
+              <p className="text-xs text-white/70 flex items-center min-w-0"><span className="w-4 h-4 mr-1 opacity-50 flex items-center justify-center shrink-0">📱</span> <span className="truncate flex-1">{bookingData.customerPhone}</span></p>
+              {bookingData.emergencyPhone && <p className="text-xs text-white/70 flex items-center min-w-0"><span className="w-4 h-4 mr-1 opacity-50 flex items-center justify-center text-red-400 shrink-0">🚨</span> <span className="truncate flex-1">{bookingData.emergencyPhone}</span></p>}
+              {bookingData.instagram && <p className="text-xs text-white/70 flex items-center min-w-0"><span className="w-4 h-4 mr-1 opacity-50 flex items-center justify-center text-blue-400 shrink-0">📸</span> <span className="truncate flex-1">{bookingData.instagram}</span></p>}
             </div>
-            <div className="text-right">
-              <span className="bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20 px-2.5 py-1 rounded text-[10px] font-bold tracking-wider">{bookingData.unit}</span>
+            <div className="text-right shrink-0">
+              <span className="bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20 px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wider whitespace-nowrap inline-block shadow-sm">{bookingData.unit}</span>
             </div>
           </div>
           
           {(bookingData.deliveryAddress || bookingData.address) && (
             <div className="mt-1">
               <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Alamat Domisili / Pengiriman</p>
-              <p className="text-xs text-white/80 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">{bookingData.deliveryAddress || bookingData.address}</p>
+              <p className="text-xs text-white/80 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5 break-words">{bookingData.deliveryAddress || bookingData.address}</p>
             </div>
           )}
           

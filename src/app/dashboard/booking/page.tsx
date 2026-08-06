@@ -201,25 +201,25 @@ export default function BookingList() {
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
               )}
               
-              <div className="flex justify-between items-start mb-3">
-                <div>
+              <div className="flex justify-between items-start gap-3 mb-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-bold text-playbox-accent mb-1 tracking-wider">{booking.code}</p>
-                  <h3 className="font-bold text-lg tracking-tight text-white/90">{booking.customer}</h3>
+                  <h3 className="font-bold text-lg tracking-tight text-white/90 truncate" title={booking.customer}>{booking.customer}</h3>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block mb-1 ${booking.statusColor}`}>
                     {booking.status}
                   </span>
-                  <p className="text-sm font-black text-playbox-ready">Rp {Number(booking.totalPrice || 0).toLocaleString('id-ID')}</p>
+                  <p className="text-sm font-black text-playbox-ready whitespace-nowrap">Rp {Number(booking.totalPrice || 0).toLocaleString('id-ID')}</p>
                 </div>
               </div>
               
               <div className="text-sm text-playbox-text-secondary mb-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <p className="flex items-center text-white/90 font-bold">
-                    <span className="w-2 h-2 rounded-full bg-playbox-accent mr-2"></span> {booking.unit}
+                <div className="flex justify-between items-center gap-2">
+                  <p className="flex items-center text-white/90 font-bold min-w-0 flex-1 truncate">
+                    <span className="w-2 h-2 rounded-full bg-playbox-accent mr-2 shrink-0"></span> <span className="truncate">{booking.unit}</span>
                   </p>
-                  <span className="text-xs font-semibold text-white/60">
+                  <span className="text-xs font-semibold text-white/60 shrink-0 whitespace-nowrap">
                     {durHours === 168 ? '1 Minggu' : durHours >= 24 ? `${durHours/24} Hari` : `${durHours} Jam`}
                   </span>
                 </div>
@@ -246,8 +246,8 @@ export default function BookingList() {
                 </div>
                 
                 <div className="pt-1 flex flex-col space-y-1.5 border-t border-white/5">
-                  <p className="flex items-center text-xs text-white/70"><span className="opacity-60 mr-2">📞</span> {booking.customerPhone || '-'}</p>
-                  <p className="flex items-start text-xs text-white/70"><span className="opacity-60 mr-2">🛵</span> <span className="flex-1 leading-snug">{booking.requireDelivery ? `Diantar: ${booking.deliveryAddress || booking.address || '-'}` : 'Ambil di Toko (Mandiri)'}</span></p>
+                  <p className="flex items-center text-xs text-white/70 min-w-0"><span className="opacity-60 mr-2 shrink-0">📞</span> <span className="truncate flex-1">{booking.customerPhone || '-'}</span></p>
+                  <p className="flex items-start text-xs text-white/70 min-w-0"><span className="opacity-60 mr-2 shrink-0 mt-0.5">🛵</span> <span className="flex-1 leading-snug truncate">{booking.requireDelivery ? `Diantar: ${booking.deliveryAddress || booking.address || '-'}` : 'Ambil di Toko (Mandiri)'}</span></p>
                 </div>
               </div>
 
