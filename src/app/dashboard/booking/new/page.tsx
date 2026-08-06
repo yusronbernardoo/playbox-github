@@ -32,8 +32,6 @@ export default function NewBooking() {
   
   // Custom Dropdown States
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-  const [tempTime, setTempTime] = useState('08:00');
 
   const [availableUnits, setAvailableUnits] = useState<any[]>([]);
   const [savedPaymentMethods, setSavedPaymentMethods] = useState<any[]>([]);
@@ -453,7 +451,7 @@ export default function NewBooking() {
                 <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Tanggal Mulai</label>
                 <div className="relative">
                   <div 
-                    onClick={() => { setIsDatePickerOpen(!isDatePickerOpen); setIsTimePickerOpen(false); }}
+                    onClick={() => { setIsDatePickerOpen(!isDatePickerOpen); }}
                     className={`w-full p-4 rounded-xl bg-black/20 border text-sm flex justify-between items-center cursor-pointer transition-all ${isDatePickerOpen ? 'border-playbox-accent text-white' : 'border-white/10 text-white/80'}`}
                   >
                     {schedule.date ? format(new Date(schedule.date), 'dd MMMM yyyy', { locale: idLocale }) : <span className="text-white/20">Pilih Tanggal</span>}
@@ -494,9 +492,9 @@ export default function NewBooking() {
                 </div>
               </div>
               
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-[11px] font-medium text-playbox-text-secondary uppercase tracking-wider">Jam Mulai</label>
+              <div className="pt-1">
+                <div className="flex justify-between items-center mb-2.5">
+                  <label className="text-[11px] font-bold text-playbox-text-secondary uppercase tracking-wider">Jam Mulai Sewa</label>
                   <button 
                     type="button" 
                     onClick={() => {
@@ -504,121 +502,69 @@ export default function NewBooking() {
                       const t = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
                       setSchedule({...schedule, time: t});
                     }}
-                    className="text-[10px] font-bold text-playbox-accent hover:text-white transition-colors"
+                    className="text-[10px] font-bold text-playbox-accent hover:text-white transition-colors bg-playbox-accent/10 px-2 py-1 rounded-md"
                   >
                     Waktu Saat Ini
                   </button>
                 </div>
-                <div className="relative">
-                  <div 
-                    onClick={() => { 
-                      setTempTime(schedule.time || '08:00'); 
-                      setIsTimePickerOpen(true); 
-                      setIsDatePickerOpen(false); 
-                    }}
-                    className={`w-full p-4 rounded-xl bg-black/20 border text-sm flex justify-between items-center cursor-pointer transition-all ${isTimePickerOpen ? 'border-playbox-accent text-white' : 'border-white/10 text-white/80'}`}
-                  >
-                    {schedule.time || <span className="text-white/20">00:00</span>}
-                    <span className="opacity-70">⏰</span>
+                
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex items-center space-x-2 bg-black/30 p-2 rounded-2xl border border-white/10 shrink-0 w-full sm:w-auto justify-center">
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      maxLength={2} 
+                      value={(schedule.time || '00:00').split(':')[0]} 
+                      onChange={(e) => {
+                         let h = e.target.value.replace(/\D/g, '');
+                         if (parseInt(h) > 23) h = '23';
+                         setSchedule({...schedule, time: `${h}:${(schedule.time || '00:00').split(':')[1] || '00'}`});
+                      }}
+                      onBlur={(e) => {
+                         let h = e.target.value;
+                         if (h.length === 1) h = '0' + h;
+                         if (h.length === 0) h = '00';
+                         setSchedule({...schedule, time: `${h}:${(schedule.time || '00:00').split(':')[1] || '00'}`});
+                      }}
+                      className="w-14 h-12 bg-black/50 border border-white/5 rounded-xl text-2xl text-center font-black text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
+                    />
+                    <span className="text-xl font-black text-white/30">:</span>
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      maxLength={2} 
+                      value={(schedule.time || '00:00').split(':')[1] || '00'} 
+                      onChange={(e) => {
+                         let m = e.target.value.replace(/\D/g, '');
+                         if (parseInt(m) > 59) m = '59';
+                         setSchedule({...schedule, time: `${(schedule.time || '00:00').split(':')[0] || '00'}:${m}`});
+                      }}
+                      onBlur={(e) => {
+                         let m = e.target.value;
+                         if (m.length === 1) m = '0' + m;
+                         if (m.length === 0) m = '00';
+                         setSchedule({...schedule, time: `${(schedule.time || '00:00').split(':')[0] || '00'}:${m}`});
+                      }}
+                      className="w-14 h-12 bg-black/50 border border-white/5 rounded-xl text-2xl text-center font-black text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
+                    />
                   </div>
                   
-                  {isTimePickerOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-                      <div className="bg-[#0D1122]/95 p-5 sm:p-6 border border-white/15 rounded-3xl shadow-2xl relative max-w-[340px] w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
-                          <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                            <span>⏰</span> Pilih Waktu Sewa
-                          </h3>
-                          <button 
-                            type="button" 
-                            onClick={() => setIsTimePickerOpen(false)} 
-                            className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors text-sm"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        
-                        {/* Direct Input (Display Jam & Menit) */}
-                        <div className="flex justify-center items-center space-x-2 mb-4 bg-black/30 p-3 rounded-2xl border border-white/5">
-                          <div className="text-center">
-                            <span className="text-[10px] text-white/40 block mb-1 font-semibold uppercase">Jam</span>
-                            <input 
-                              type="text" 
-                              inputMode="numeric"
-                              maxLength={2} 
-                              value={tempTime.split(':')[0]} 
-                              onChange={(e) => {
-                                 let h = e.target.value.replace(/\D/g, '');
-                                 if (parseInt(h) > 23) h = '23';
-                                 setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
-                              }}
-                              onBlur={(e) => {
-                                 let h = e.target.value;
-                                 if (h.length === 1) h = '0' + h;
-                                 if (h.length === 0) h = '00';
-                                 setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
-                              }}
-                              className="w-16 h-14 bg-black/50 border border-white/10 rounded-xl text-3xl text-center font-black text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
-                            />
-                          </div>
-                          <span className="text-3xl font-black text-white/30 pt-4">:</span>
-                          <div className="text-center">
-                            <span className="text-[10px] text-white/40 block mb-1 font-semibold uppercase">Menit</span>
-                            <input 
-                              type="text" 
-                              inputMode="numeric"
-                              maxLength={2} 
-                              value={tempTime.split(':')[1] || '00'} 
-                              onChange={(e) => {
-                                 let m = e.target.value.replace(/\D/g, '');
-                                 if (parseInt(m) > 59) m = '59';
-                                 setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
-                              }}
-                              onBlur={(e) => {
-                                 let m = e.target.value;
-                                 if (m.length === 1) m = '0' + m;
-                                 if (m.length === 0) m = '00';
-                                 setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
-                              }}
-                              className="w-16 h-14 bg-black/50 border border-white/10 rounded-xl text-3xl text-center font-black text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
-                            />
-                          </div>
-                        </div>
-
-                        {/* Quick Select Grid */}
-                        <div className="mb-5">
-                          <p className="text-[10px] text-white/40 text-center mb-2 uppercase tracking-widest font-semibold">Pilih Cepat</p>
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
-                              <button 
-                                key={t}
-                                type="button"
-                                onClick={() => setTempTime(t)}
-                                className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                                  tempTime === t 
-                                    ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' 
-                                    : 'bg-white/5 border-transparent text-white/70 hover:bg-white/10 hover:text-white'
-                                }`}
-                              >
-                                {t}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setSchedule({...schedule, time: tempTime});
-                            setIsTimePickerOpen(false);
-                          }}
-                          className="w-full py-3.5 bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(226,23,142,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all text-sm"
-                        >
-                          Simpan Jam ({tempTime})
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex-1 w-full grid grid-cols-4 sm:flex sm:flex-wrap gap-1.5">
+                    {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
+                      <button 
+                        key={t}
+                        type="button"
+                        onClick={() => setSchedule({...schedule, time: t})}
+                        className={`px-2 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all border ${
+                          schedule.time === t 
+                            ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' 
+                            : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
