@@ -19,11 +19,30 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const [manualDamageFee, setManualDamageFee] = useState('');
   const [damageDesc, setDamageDesc] = useState('');
 
-  // Rules
+  // Rules & Shop Info
   const [dendaRules, setDendaRules] = useState({ tolerance: 15, hourlyRate: 20000 });
+  const [shopInfo, setShopInfo] = useState({
+    brandName: 'PlayBox Rental',
+    phone: '081234567890',
+    address: 'Jl. Soekarno Hatta No. 12, Malang'
+  });
 
   useEffect(() => {
     const loadBookingData = async () => {
+      // Load Shop Info from Firestore or localStorage
+      try {
+        const shopSnap = await getDoc(doc(db, 'settings', 'shop'));
+        if (shopSnap.exists()) {
+          setShopInfo(shopSnap.data() as any);
+        } else {
+          const savedShop = localStorage.getItem('playbox_shop_settings');
+          if (savedShop) setShopInfo(JSON.parse(savedShop));
+        }
+      } catch (e) {
+        const savedShop = localStorage.getItem('playbox_shop_settings');
+        if (savedShop) setShopInfo(JSON.parse(savedShop));
+      }
+
       // Load Rules
       let rules = { tolerance: 15, hourlyRate: 20000 };
       const savedRules = localStorage.getItem('playbox_denda_rules');
@@ -172,7 +191,8 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       
       const totalDenda = autoLateFee + (parseInt(manualDamageFee.replace(/\D/g, '')) || 0);
       
-      const text = `Halo ${booking.customer},\n\nTerima kasih telah menyewa di *Playbox*! \uD83C\uDFAE\nBerikut adalah rincian Invoice Akhir (Selesai) untuk pesanan Anda (ID: *${booking.id}*).\n\nBiaya Denda (Telat/Kerusakan): *Rp ${totalDenda.toLocaleString('id-ID')}*\n\n_(Catatan: Jika ada gambar struk yang dilampirkan, silakan cek rincian lengkapnya di situ)_\n\nTerima kasih telah berlangganan! \uD83D\uDD25`;
+      const shopName = shopInfo?.brandName || 'Playbox Rental';
+      const text = `Halo ${booking.customer},\n\nTerima kasih telah menyewa di *${shopName}*! 🎮\nBerikut adalah rincian Invoice Akhir (Selesai) untuk pesanan Anda (ID: *${booking.id}*).\n\nBiaya Denda (Telat/Kerusakan): *Rp ${totalDenda.toLocaleString('id-ID')}*\n\n_(Catatan: Jika ada gambar struk yang dilampirkan, silakan cek rincian lengkapnya di situ)_\n\nHubungi CS kami: *${shopInfo.phone || ''}*\nTerima kasih telah berlangganan! 🔥`;
       
       const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
       
@@ -211,8 +231,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         
         {/* Kop Struk (khusus untuk di gambar) */}
         <div className="text-center mb-6 pt-4 border-b border-white/10 pb-4">
-          <h2 className="text-xl font-black text-white tracking-tighter">PLAYBOX</h2>
-          <p className="text-xs text-white/50 mt-1">Struk Penyewaan Resmi</p>
+          <h2 className="text-xl font-black text-white tracking-tighter uppercase">{shopInfo?.brandName || 'PLAYBOX RENTAL'}</h2>
+          <p className="text-xs text-white/70 mt-0.5">{shopInfo?.address || 'Struk Penyewaan Resmi'}</p>
+          <p className="text-[11px] text-white/50">WA CS: {shopInfo?.phone || '-'}</p>
           <p className="text-[10px] text-playbox-accent font-mono mt-2">ID: {booking.id} | Nama: {booking.customer}</p>
         </div>
 

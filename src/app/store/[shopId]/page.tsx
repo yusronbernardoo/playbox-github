@@ -6,7 +6,7 @@ import 'react-day-picker/dist/style.css';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { db } from '@/lib/firebase';
-import { collection, doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
 export default function StorefrontPage({ params }: { params: Promise<{ shopId: string }> }) {
   const router = useRouter();
@@ -34,26 +34,44 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
   const [displayShopName, setDisplayShopName] = useState<string>('');
+  const [shopProfile, setShopProfile] = useState<{
+    brandName?: string;
+    phone?: string;
+    address?: string;
+    bio?: string;
+  }>({});
 
   useEffect(() => {
-    const fetchStoreData = () => {
-      // Dynamic SaaS Loading: Get settings from mock DB
-      const settings = localStorage.getItem('playbox_shop_settings');
-      let loadedBrand = '';
-      
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        if (parsed.slug === unwrappedParams.shopId) {
-          loadedBrand = parsed.brandName;
+    const fetchStoreData = async () => {
+      // Dynamic SaaS Loading: Get settings from Firestore first, then localStorage
+      let loadedProfile: any = null;
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'shop'));
+        if (snap.exists()) {
+          loadedProfile = snap.data();
+        }
+      } catch (e) {
+        console.warn('Firestore shop settings fallback in store:', e);
+      }
+
+      if (!loadedProfile) {
+        const settings = localStorage.getItem('playbox_shop_settings');
+        if (settings) {
+          loadedProfile = JSON.parse(settings);
         }
       }
+
+      let loadedBrand = loadedProfile?.brandName || '';
       
-      // Fallback if not found in our "DB", just format the slug nicely
+      // Fallback if not found, just format the slug nicely
       if (!loadedBrand) {
         loadedBrand = unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
       }
       
       setDisplayShopName(loadedBrand);
+      if (loadedProfile) {
+        setShopProfile(loadedProfile);
+      }
       
       // Fetch units
       const savedUnits = localStorage.getItem('playbox_mock_units');
@@ -206,12 +224,33 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       <div className="ambient-glow"></div>
       
       {/* Header */}
-      <header className="relative z-10 p-6 pt-10 text-center pb-8 border-b border-white/5 bg-black/20 backdrop-blur-md">
-        <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-3xl font-black text-white shadow-[0_10px_30px_rgba(226,23,142,0.4)] mb-4 uppercase">
+      <header className="relative z-10 p-6 pt-10 text-center pb-6 border-b border-white/5 bg-black/20 backdrop-blur-md">
+        <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-3xl font-black text-white shadow-[0_10px_30px_rgba(226,23,142,0.4)] mb-3 uppercase">
           {displayShopName ? displayShopName.charAt(0) : 'P'}
         </div>
         <h1 className="text-2xl font-black tracking-tight text-white mb-1">{displayShopName}</h1>
-        <p className="text-sm text-playbox-text-secondary">Pusat Sewa Konsol Premium</p>
+        <p className="text-xs text-playbox-text-secondary max-w-xs mx-auto mb-3">
+          {shopProfile.bio || 'Pusat Sewa PlayStation 5 & PS4 Premium Terpercaya'}
+        </p>
+
+        {shopProfile.address && (
+          <p className="text-[11px] text-white/50 flex items-center justify-center mb-3">
+            <span className="mr-1">📍</span> {shopProfile.address}
+          </p>
+        )}
+
+        {shopProfile.phone && (
+          <button 
+            onClick={() => {
+              let p = shopProfile.phone || '';
+              if (p.startsWith('0')) p = '62' + p.substring(1);
+              window.open(`https://wa.me/${p}?text=${encodeURIComponent(`Halo ${displayShopName}, saya ingin bertanya seputar sewa konsol PlayStation.`)}`, '_blank');
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.2)]"
+          >
+            <span>💬</span> Tanya CS WhatsApp
+          </button>
+        )}
       </header>
 
       {/* Main Content */}
