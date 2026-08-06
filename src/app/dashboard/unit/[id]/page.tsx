@@ -2,6 +2,8 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 export default function UnitDetail() {
   const { id } = useParams();
@@ -9,21 +11,54 @@ export default function UnitDetail() {
   const [unit, setUnit] = useState<any>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('playbox_mock_units');
-    if (saved) {
-      const units = JSON.parse(saved);
-      const found = units.find((u: any) => u.id === id);
-      if (found) setUnit(found);
-    }
-  }, [id]);
+    if (!id || typeof id !== 'string') return;
 
-  const handleDelete = () => {
-    if (confirm('Yakin ingin menghapus unit ini? Tindakan ini tidak dapat dibatalkan.')) {
+    // Real-time listener for unit details
+    const unsub = onSnapshot(doc(db, 'units', id), (snap) => {
+      if (snap.exists()) {
+        setUnit({ ...snap.data(), id: snap.id });
+      } else {
+        const saved = localStorage.getItem('playbox_mock_units');
+        if (saved) {
+          try {
+            const units = JSON.parse(saved);
+            const found = units.find((u: any) => u.id === id);
+            if (found) setUnit(found);
+          } catch {}
+        }
+      }
+    }, (err) => {
+      console.warn('Unit snapshot error:', err);
       const saved = localStorage.getItem('playbox_mock_units');
       if (saved) {
-        let units = JSON.parse(saved);
-        units = units.filter((u: any) => u.id !== id);
-        localStorage.setItem('playbox_mock_units', JSON.stringify(units));
+        try {
+          const units = JSON.parse(saved);
+          const found = units.find((u: any) => u.id === id);
+          if (found) setUnit(found);
+        } catch {}
+      }
+    });
+
+    return () => unsub();
+  }, [id]);
+
+  const handleDelete = async () => {
+    if (confirm('Yakin ingin menghapus unit ini? Tindakan ini tidak dapat dibatalkan.')) {
+      try {
+        if (id && typeof id === 'string') {
+          await deleteDoc(doc(db, 'units', id));
+        }
+      } catch (err) {
+        console.error('Error deleting unit from Firestore:', err);
+      }
+
+      const saved = localStorage.getItem('playbox_mock_units');
+      if (saved) {
+        try {
+          let units = JSON.parse(saved);
+          units = units.filter((u: any) => u.id !== id);
+          localStorage.setItem('playbox_mock_units', JSON.stringify(units));
+        } catch {}
       }
       alert('Unit berhasil dihapus!');
       router.push('/dashboard/unit');

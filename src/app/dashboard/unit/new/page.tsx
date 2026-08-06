@@ -1,9 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function UnitNew() {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     code: '',
@@ -53,30 +56,46 @@ export default function UnitNew() {
     setPriceTiers(priceTiers.filter((_, i) => i !== idx));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
+    const unitId = 'U' + Date.now().toString().slice(-4);
     const newUnit = {
-      id: 'U' + Math.floor(Math.random() * 1000),
+      id: unitId,
+      code: formData.code,
       name: formData.name,
       type: formData.type,
+      description: formData.description,
       status: 'Ready',
       statusColor: 'bg-playbox-ready/15 text-playbox-ready shadow-[0_0_10px_rgba(35,197,82,0.3)]',
       price: parseInt(priceTiers[0]?.price) || 0,
       priceTiers: priceTiers.map(t => ({ durationVal: parseInt(t.durationVal) || 0, durationUnit: t.durationUnit, price: parseInt(t.price) || 0 })),
       image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=500&q=80',
       specs: packageItems.filter(p => p.trim() !== ''),
-      games: games.filter(g => g.trim() !== '')
+      games: games.filter(g => g.trim() !== ''),
+      createdAt: new Date().toISOString()
     };
 
+    try {
+      // 1. Simpan ke Cloud Firestore (Real-Time across all devices)
+      await setDoc(doc(db, 'units', unitId), newUnit);
+    } catch (err) {
+      console.error('Error saving unit to Firestore:', err);
+    }
+
+    // 2. Simpan juga ke LocalStorage sebagai offline cache
     const saved = localStorage.getItem('playbox_mock_units');
     let units = [];
     if (saved) {
-      units = JSON.parse(saved);
+      try {
+        units = JSON.parse(saved);
+      } catch {}
     }
     units.push(newUnit);
     localStorage.setItem('playbox_mock_units', JSON.stringify(units));
 
+    setIsSubmitting(false);
     alert("Unit Baru Berhasil Ditambahkan!");
     router.push('/dashboard/unit');
   };

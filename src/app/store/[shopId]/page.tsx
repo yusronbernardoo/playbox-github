@@ -107,25 +107,53 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       console.warn('Shop profile realtime sync error:', err);
     });
 
-    // 2. Real-time Units Listener
+    // 2. Real-time Units & Active Bookings Listener
+    let activeBusyKeys = new Set<string>();
+    let rawUnitsList: any[] = [];
+
+    const updateCombinedUnits = (unitsData: any[]) => {
+      return unitsData.map(u => {
+        if (u.status === 'Maintenance') return u;
+        const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
+        return {
+          ...u,
+          status: isBusy ? 'Disewa' : (u.status || 'Ready')
+        };
+      });
+    };
+
     const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
       if (!snapshot.empty) {
         const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUnits(liveUnits);
+        rawUnitsList = liveUnits;
+        setUnits(updateCombinedUnits(liveUnits));
         localStorage.setItem('playbox_mock_units', JSON.stringify(liveUnits));
       } else {
         const savedUnits = localStorage.getItem('playbox_mock_units');
         if (savedUnits) {
-          setUnits(JSON.parse(savedUnits));
+          try {
+            const parsed = JSON.parse(savedUnits);
+            rawUnitsList = parsed;
+            setUnits(updateCombinedUnits(parsed));
+          } catch {}
         } else {
-          setUnits([
-            {
-              id: 'U01', name: 'PS5 Premium Set (#01)', type: 'PlayStation 5', status: 'Ready', price: 150000, 
-              image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=500&q=80',
-              specs: ['2 Stik Original', 'FIFA 24', 'GTA V', 'God of War']
-            }
-          ]);
+          rawUnitsList = [];
+          setUnits([]);
         }
+      }
+    });
+
+    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const activeBookings = snapshot.docs
+        .map(doc => doc.data())
+        .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
+      
+      activeBusyKeys = new Set(
+        activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
+      );
+
+      if (rawUnitsList.length > 0) {
+        setUnits(updateCombinedUnits(rawUnitsList));
       }
     });
 
@@ -154,6 +182,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     return () => {
       unsubscribeShop();
       unsubscribeUnits();
+      unsubscribeBookings();
       unsubscribePayments();
     };
   }, [unwrappedParams.shopId]);

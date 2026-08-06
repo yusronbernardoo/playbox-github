@@ -1,6 +1,8 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function EditUnit() {
   const { id } = useParams();
@@ -40,20 +42,41 @@ export default function EditUnit() {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('playbox_mock_units');
-    if (saved) {
-      const units = JSON.parse(saved);
-      const found = units.find((u: any) => u.id === id);
+    const loadUnit = async () => {
+      if (!id || typeof id !== 'string') return;
+      let found: any = null;
+
+      try {
+        const snap = await getDoc(doc(db, 'units', id));
+        if (snap.exists()) {
+          found = { ...snap.data(), id: snap.id };
+        }
+      } catch (err) {
+        console.warn('Firestore get unit err:', err);
+      }
+
+      if (!found) {
+        const saved = localStorage.getItem('playbox_mock_units');
+        if (saved) {
+          try {
+            const units = JSON.parse(saved);
+            found = units.find((u: any) => u.id === id);
+          } catch {}
+        }
+      }
+
       if (found) {
         setUnit({
           ...found,
           priceTiers: found.priceTiers || [{ durationVal: 24, durationUnit: 'Jam', price: found.price || 0 }],
-          specs: found.specs || [], // ensure specs is an array
-          games: found.games || [] // ensure games is an array
+          specs: found.specs || [],
+          games: found.games || []
         });
         setPreviewImage(found.image);
       }
-    }
+    };
+
+    loadUnit();
   }, [id]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,29 +116,42 @@ export default function EditUnit() {
     setUnit({ ...unit, games: unit.games.filter((_: any, i: number) => i !== idx) });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Clean up empty specs before saving
     const cleanedUnit = {
       ...unit,
+      price: parseInt(unit.priceTiers[0]?.price) || unit.price || 0,
       priceTiers: unit.priceTiers.map((t: any) => ({ 
         durationVal: parseInt(t.durationVal) || 0, 
         durationUnit: t.durationUnit, 
         price: parseInt(t.price) || 0 
       })),
       specs: unit.specs.filter((s: string) => s.trim() !== ''),
-      games: unit.games.filter((g: string) => g.trim() !== '')
+      games: unit.games.filter((g: string) => g.trim() !== ''),
+      updatedAt: new Date().toISOString()
     };
 
+    // 1. Sync to Cloud Firestore
+    try {
+      if (id && typeof id === 'string') {
+        await setDoc(doc(db, 'units', id), cleanedUnit, { merge: true });
+      }
+    } catch (err) {
+      console.error('Error updating unit in Firestore:', err);
+    }
+
+    // 2. Sync to LocalStorage
     const saved = localStorage.getItem('playbox_mock_units');
     if (saved) {
-      const units = JSON.parse(saved);
-      // parse price to number before saving
-      const finalUnit = { ...cleanedUnit, price: cleanedUnit.priceTiers[0]?.price || 0 };
-      const updated = units.map((u: any) => u.id === id ? finalUnit : u);
-      localStorage.setItem('playbox_mock_units', JSON.stringify(updated));
+      try {
+        const units = JSON.parse(saved);
+        const updated = units.map((u: any) => u.id === id ? cleanedUnit : u);
+        localStorage.setItem('playbox_mock_units', JSON.stringify(updated));
+      } catch {}
     }
+    
     alert("Perubahan berhasil disimpan!");
     router.push(`/dashboard/unit/${id}`);
   };

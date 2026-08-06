@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, setDoc } from 'firebase/firestore';
 
 export default function UnitList() {
   const router = useRouter();
@@ -13,7 +13,6 @@ export default function UnitList() {
   const filters = ['Semua', 'Ready', 'Disewa', 'Maintenance'];
 
   const defaultUnits: any[] = [];
-
   const [units, setUnits] = useState<any[]>([]);
 
   useEffect(() => {
@@ -28,38 +27,79 @@ export default function UnitList() {
       setRole(JSON.parse(authData).role);
     }
 
-    const saved = localStorage.getItem('playbox_mock_units');
-    if (saved) {
-      setUnits(JSON.parse(saved));
-    } else {
-      setUnits(defaultUnits);
-      localStorage.setItem('playbox_mock_units', JSON.stringify(defaultUnits));
-    }
+    // 1. Live state for active bookings
+    let activeBusyKeys = new Set<string>();
 
-    // Real-time listener from Firestore active bookings
+    const applyStatusUpdate = (rawUnits: any[]) => {
+      return rawUnits.map(u => {
+        if (u.status === 'Maintenance') return u;
+        const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
+        return {
+          ...u,
+          status: isBusy ? 'Disewa' : (u.status || 'Ready'),
+          statusColor: isBusy 
+            ? 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20' 
+            : 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20'
+        };
+      });
+    };
+
+    // 2. Real-time Firestore units listener
+    const unsubUnits = onSnapshot(collection(db, 'units'), async (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudUnits: any[] = [];
+        snapshot.forEach((d) => {
+          cloudUnits.push({ ...d.data(), id: d.id });
+        });
+        localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+        setUnits(applyStatusUpdate(cloudUnits));
+      } else {
+        // If Firestore is empty, auto-sync existing local units to Firestore
+        const saved = localStorage.getItem('playbox_mock_units');
+        if (saved) {
+          try {
+            const localUnits = JSON.parse(saved);
+            if (Array.isArray(localUnits) && localUnits.length > 0) {
+              setUnits(applyStatusUpdate(localUnits));
+              // Push to Cloud Firestore
+              for (const u of localUnits) {
+                if (u.id) {
+                  await setDoc(doc(db, 'units', u.id), u);
+                }
+              }
+              return;
+            }
+          } catch {}
+        }
+        setUnits(defaultUnits);
+      }
+    }, (err) => {
+      console.warn('Unit listener err:', err);
+      const saved = localStorage.getItem('playbox_mock_units');
+      if (saved) {
+        try { setUnits(JSON.parse(saved)); } catch {}
+      }
+    });
+
+    // 3. Real-time Firestore active bookings listener
     const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
       const activeBookings = snapshot.docs
-        .map(doc => doc.data())
+        .map(d => d.data())
         .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
       
-      const busyUnitKeys = new Set(
+      activeBusyKeys = new Set(
         activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
       );
 
-      setUnits(prev => prev.map(u => {
-        if (u.status === 'Maintenance') return u;
-        const isBusy = busyUnitKeys.has(u.id) || busyUnitKeys.has(u.name);
-        return {
-          ...u,
-          status: isBusy ? 'Disewa' : 'Ready',
-          statusColor: isBusy ? 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20' : 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20'
-        };
-      }));
+      setUnits(prev => applyStatusUpdate(prev));
     }, (err) => {
       console.warn('Unit bookings listener err:', err);
     });
 
-    return () => unsubBookings();
+    return () => {
+      unsubUnits();
+      unsubBookings();
+    };
   }, []);
 
   const filteredUnits = units.filter(u => {
@@ -138,9 +178,16 @@ export default function UnitList() {
                         ✏️
                       </button>
                       <button 
-                        onClick={(e) => { 
+                        onClick={async (e) => { 
                           e.preventDefault(); 
-                          if(confirm('Yakin ingin menghapus unit ini?')) {
+                          if(confirm(`Yakin ingin menghapus unit "${unit.name}"?`)) {
+                            try {
+                              if (unit.id) {
+                                await deleteDoc(doc(db, 'units', unit.id));
+                              }
+                            } catch (err) {
+                              console.error('Error deleting unit from Firestore:', err);
+                            }
                             const newUnits = units.filter(x => x.id !== unit.id);
                             setUnits(newUnits);
                             localStorage.setItem('playbox_mock_units', JSON.stringify(newUnits));

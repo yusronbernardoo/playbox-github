@@ -170,6 +170,18 @@ export default function ReturnCheck() {
       }
     }
 
+    if (bookingData?.unitId) {
+      try {
+        await updateDoc(doc(db, 'units', bookingData.unitId), {
+          status: 'Ready',
+          statusColor: 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20',
+          updatedAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error('Failed to update unit status in Firestore:', err);
+      }
+    }
+
     if (savedUnits && bookingData?.unitId) {
       let units = JSON.parse(savedUnits);
       units = units.map((u: any) => {
