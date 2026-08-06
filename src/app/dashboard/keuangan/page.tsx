@@ -325,12 +325,16 @@ export default function Keuangan() {
       </div>
 
       {/* Net Profit */}
-      <div className="glass-surface-elevated p-5 rounded-3xl border-l-4 border-l-[#25D366] flex justify-between items-center shadow-[0_8px_30px_rgba(35,197,82,0.15)] border border-white/5">
-        <div>
-          <h2 className="text-xs font-bold text-white/80 tracking-wider uppercase">Net Profit (Laba Bersih)</h2>
+      <div className="glass-surface-elevated p-5 rounded-3xl border-l-4 border-l-[#25D366] flex justify-between items-center gap-3 relative overflow-hidden border border-white/5 shadow-[0_4px_20px_rgba(37,211,102,0.1)]">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xs font-bold text-white/90 tracking-wider uppercase truncate">Net Profit (Laba Bersih)</h2>
           <p className="text-[10px] text-white/40 font-medium mt-0.5">(Pendapatan - Pengeluaran)</p>
         </div>
-        <span className="text-2xl font-black text-[#25D366] tracking-tight">Rp {profit.toLocaleString('id-ID')}</span>
+        <div className="shrink-0 text-right">
+          <span className={`text-xl sm:text-2xl font-black tracking-tight ${profit >= 0 ? 'text-[#25D366]' : 'text-red-400'}`}>
+            {profit < 0 ? `-Rp ${Math.abs(profit).toLocaleString('id-ID')}` : `Rp ${profit.toLocaleString('id-ID')}`}
+          </span>
+        </div>
       </div>
 
       {/* Pengeluaran Section with Trash Icon and 2-Step Verification */}

@@ -19,6 +19,14 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
   
   // Lightbox Modal
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, fieldName: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   useEffect(() => {
     // 1. Real-time Firestore Document Listener
@@ -364,23 +372,76 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
         )}
       </div>
 
-      <div className="glass-surface p-5 rounded-3xl space-y-5 border border-white/5">
+      <div className="glass-surface p-5 rounded-3xl space-y-4 border border-white/5">
         <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest">Data Customer</h2>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-playbox-text-secondary mb-1">Nama Lengkap</p>
-            <p className="font-semibold text-sm text-white/90">{booking.customer}</p>
+        {/* Nama Lengkap */}
+        <div className="bg-black/25 p-3 rounded-2xl border border-white/5">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[11px] font-medium text-playbox-text-secondary">Nama Lengkap</span>
+            {copiedField === 'name' && <span className="text-[10px] text-[#25D366] font-bold animate-pulse">Tersalin!</span>}
           </div>
-          <div>
-            <p className="text-xs text-playbox-text-secondary mb-1">Nomor WhatsApp</p>
-            <p className="font-semibold text-sm text-white/90">{booking.customerPhone}</p>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <p className="font-bold text-sm text-white/95 truncate min-w-0 flex-1">{booking.customer || '-'}</p>
+            <button 
+              type="button"
+              onClick={() => handleCopyText(booking.customer, 'name')}
+              title="Salin Nama"
+              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs shrink-0 transition-colors"
+            >
+              📋 Salin
+            </button>
           </div>
         </div>
 
-        <div>
-          <p className="text-xs text-playbox-text-secondary mb-1">Alamat Domisili / Pengiriman</p>
-          <p className="font-semibold text-sm text-white/90 leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">{displayAddress}</p>
+        {/* Nomor WhatsApp */}
+        <div className="bg-black/25 p-3 rounded-2xl border border-white/5">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[11px] font-medium text-playbox-text-secondary">Nomor WhatsApp</span>
+            {copiedField === 'phone' && <span className="text-[10px] text-[#25D366] font-bold animate-pulse">Tersalin!</span>}
+          </div>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <p className="font-bold text-sm text-white/95 truncate min-w-0 flex-1">{booking.customerPhone || '-'}</p>
+            <div className="flex items-center space-x-1.5 shrink-0">
+              {booking.customerPhone && (
+                <a 
+                  href={`https://wa.me/${booking.customerPhone.replace(/\D/g, '').startsWith('0') ? '62' + booking.customerPhone.replace(/\D/g, '').slice(1) : booking.customerPhone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 text-xs font-semibold flex items-center gap-1 transition-colors"
+                >
+                  <span>💬</span> WA
+                </a>
+              )}
+              <button 
+                type="button"
+                onClick={() => handleCopyText(booking.customerPhone, 'phone')}
+                title="Salin Nomor"
+                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs transition-colors"
+              >
+                📋
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Alamat Domisili / Pengiriman */}
+        <div className="bg-black/25 p-3 rounded-2xl border border-white/5">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[11px] font-medium text-playbox-text-secondary">Alamat Domisili / Pengiriman</span>
+            {copiedField === 'address' && <span className="text-[10px] text-[#25D366] font-bold animate-pulse">Tersalin!</span>}
+          </div>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <p className="font-semibold text-sm text-white/90 truncate min-w-0 flex-1">{displayAddress || '-'}</p>
+            <button 
+              type="button"
+              onClick={() => handleCopyText(displayAddress, 'address')}
+              title="Salin Alamat"
+              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs shrink-0 transition-colors"
+            >
+              📋 Salin
+            </button>
+          </div>
         </div>
 
         <div>

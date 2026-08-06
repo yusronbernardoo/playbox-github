@@ -115,15 +115,15 @@ export default function CustomerSchedule() {
               </div>
               
               {isTimePickerOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                  <div className="bg-playbox-surface p-6 border border-white/10 rounded-3xl shadow-2xl relative max-w-[320px] w-full">
-                    <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
+                  <div className="bg-[#161B30] p-6 border border-white/10 rounded-3xl shadow-2xl relative max-w-[320px] w-full space-y-5">
+                    <div className="flex justify-between items-center">
                       <h3 className="text-white font-bold text-sm">Pilih Waktu Sewa</h3>
-                      <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors">✕</button>
+                      <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors text-xs">✕</button>
                     </div>
                     
                     {/* Direct Input (Big Display) */}
-                    <div className="flex justify-center items-center space-x-3 mb-8">
+                    <div className="flex justify-center items-center space-x-3 my-2">
                       <input 
                         type="text" 
                         maxLength={2} 
@@ -134,14 +134,14 @@ export default function CustomerSchedule() {
                            setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
                         }}
                         onBlur={(e) => {
-                           let h = e.target.value;
-                           if (h.length === 1) h = '0' + h;
-                           if (h.length === 0) h = '00';
+                           let h = e.target.value.padStart(2, '0');
+                           if (!h || h === '000') h = '08';
+                           if (parseInt(h) > 23) h = '23';
                            setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
                         }}
-                        className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl text-4xl text-center font-bold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
+                        className="w-20 h-20 bg-[#0E1326] border border-white/10 rounded-2xl text-4xl text-center font-extrabold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all shadow-inner" 
                       />
-                      <span className="text-4xl font-bold text-white/30 pb-2">:</span>
+                      <span className="text-4xl font-extrabold text-white/30 pb-1">:</span>
                       <input 
                         type="text" 
                         maxLength={2} 
@@ -152,37 +152,43 @@ export default function CustomerSchedule() {
                            setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
                         }}
                         onBlur={(e) => {
-                           let m = e.target.value;
-                           if (m.length === 1) m = '0' + m;
-                           if (m.length === 0) m = '00';
+                           let m = e.target.value.padStart(2, '0');
+                           if (!m || m === '000') m = '00';
+                           if (parseInt(m) > 59) m = '59';
                            setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
                         }}
-                        className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl text-4xl text-center font-bold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
+                        className="w-20 h-20 bg-[#0E1326] border border-white/10 rounded-2xl text-4xl text-center font-extrabold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all shadow-inner" 
                       />
                     </div>
 
                     {/* Quick Select Grid */}
-                    <p className="text-[10px] text-white/40 text-center mb-3 uppercase tracking-widest">Pilih Cepat</p>
-                    <div className="grid grid-cols-4 gap-2 mb-6">
-                      {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
-                        <button 
-                          key={t}
-                          type="button"
-                          onClick={() => setTempTime(t)}
-                          className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10 hover:text-white'}`}
-                        >
-                          {t}
-                        </button>
-                      ))}
+                    <div>
+                      <p className="text-[10px] text-white/40 text-center mb-3 uppercase font-bold tracking-[0.2em]">Pilih Cepat</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
+                          <button 
+                            key={t}
+                            type="button"
+                            onClick={() => setTempTime(t)}
+                            className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)] scale-105' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:text-white'}`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <button 
                       type="button"
                       onClick={() => {
-                        setSchedule({...schedule, time: tempTime});
+                        const parts = (tempTime || '08:00').split(':');
+                        const h = (parts[0] || '08').padStart(2, '0');
+                        const m = (parts[1] || '00').padStart(2, '0');
+                        const finalTime = `${h}:${m}`;
+                        setSchedule({...schedule, time: finalTime});
                         setIsTimePickerOpen(false);
                       }}
-                      className="w-full py-4 bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(226,23,142,0.3)] hover:scale-[1.02] transition-transform"
+                      className="w-full py-4 bg-gradient-to-r from-[#e2178e] via-pink-600 to-purple-600 hover:opacity-95 text-white font-bold rounded-2xl text-sm shadow-[0_4px_20px_rgba(226,23,142,0.35)] active:scale-95 transition-all"
                     >
                       Simpan Jam
                     </button>

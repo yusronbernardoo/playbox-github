@@ -579,50 +579,102 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                       </div>
                       
                       {isTimePickerOpen && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                          <div className="p-5 bg-playbox-surface border border-white/15 rounded-3xl shadow-2xl relative max-w-[320px] w-full space-y-4">
-                            <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                              <h3 className="text-white font-bold text-sm">Pilih Jam Mulai Sewa</h3>
-                              <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-xs">✕</button>
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
+                          <div className="p-6 bg-[#161B30] border border-white/10 rounded-3xl shadow-2xl relative max-w-[320px] w-full space-y-5">
+                            {/* Header */}
+                            <div className="flex justify-between items-center">
+                              <h3 className="text-white font-bold text-sm">Pilih Waktu Sewa</h3>
+                              <button 
+                                type="button" 
+                                onClick={() => setIsTimePickerOpen(false)} 
+                                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors text-xs"
+                              >
+                                ✕
+                              </button>
                             </div>
 
-                            {/* Manual Time Input */}
-                            <div>
-                              <label className="block text-[10px] font-bold text-playbox-accent uppercase tracking-wider mb-1.5">Input Jam Bebas (Manual)</label>
+                            {/* Direct Input (Big Display Boxes) */}
+                            <div className="flex justify-center items-center space-x-3 my-2">
                               <input 
-                                type="time"
-                                value={customTimeInput}
-                                onChange={(e) => setCustomTimeInput(e.target.value)}
-                                className="w-full p-3 rounded-xl bg-black/40 border border-playbox-accent text-white text-base font-bold text-center focus:outline-none"
+                                type="text" 
+                                maxLength={2} 
+                                value={(customTimeInput || '08:00').split(':')[0] || '08'} 
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(/\D/g, '');
+                                  if (parseInt(val) > 23) val = '23';
+                                  const mins = (customTimeInput || '08:00').split(':')[1] || '00';
+                                  setCustomTimeInput(`${val}:${mins}`);
+                                }}
+                                onBlur={(e) => {
+                                  let val = e.target.value.padStart(2, '0');
+                                  if (!val || val === '000') val = '08';
+                                  if (parseInt(val) > 23) val = '23';
+                                  const mins = (customTimeInput || '08:00').split(':')[1] || '00';
+                                  setCustomTimeInput(`${val}:${mins}`);
+                                }}
+                                className="w-20 h-20 bg-[#0E1326] border border-white/10 rounded-2xl text-4xl text-center font-extrabold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all shadow-inner" 
+                              />
+                              <span className="text-4xl font-extrabold text-white/30 pb-1">:</span>
+                              <input 
+                                type="text" 
+                                maxLength={2} 
+                                value={(customTimeInput || '08:00').split(':')[1] || '00'} 
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(/\D/g, '');
+                                  if (parseInt(val) > 59) val = '59';
+                                  const hrs = (customTimeInput || '08:00').split(':')[0] || '08';
+                                  setCustomTimeInput(`${hrs}:${val}`);
+                                }}
+                                onBlur={(e) => {
+                                  let val = e.target.value.padStart(2, '0');
+                                  if (!val || val === '000') val = '00';
+                                  if (parseInt(val) > 59) val = '59';
+                                  const hrs = (customTimeInput || '08:00').split(':')[0] || '08';
+                                  setCustomTimeInput(`${hrs}:${val}`);
+                                }}
+                                className="w-20 h-20 bg-[#0E1326] border border-white/10 rounded-2xl text-4xl text-center font-extrabold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all shadow-inner" 
                               />
                             </div>
 
-                            {/* Pilihan Cepat Jam Populer */}
+                            {/* Section: PILIH CEPAT */}
                             <div>
-                              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-1.5">Pilihan Jam Populer</label>
-                              <div className="grid grid-cols-4 gap-1.5">
-                                {['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'].map(t => (
-                                  <button 
-                                    key={t}
-                                    type="button"
-                                    onClick={() => setCustomTimeInput(t)}
-                                    className={`py-2 rounded-lg text-xs font-bold border transition-all ${customTimeInput === t ? 'bg-playbox-accent border-playbox-accent text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}
-                                  >
-                                    {t}
-                                  </button>
-                                ))}
+                              <p className="text-[10px] text-white/40 text-center mb-3 uppercase font-bold tracking-[0.2em]">Pilih Cepat</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => {
+                                  const isSelected = (customTimeInput || '08:00') === t;
+                                  return (
+                                    <button 
+                                      key={t}
+                                      type="button"
+                                      onClick={() => setCustomTimeInput(t)}
+                                      className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                        isSelected 
+                                          ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)] scale-105' 
+                                          : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/5'
+                                      }`}
+                                    >
+                                      {t}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
 
+                            {/* Tombol Simpan Jam */}
                             <button 
                               type="button"
                               onClick={() => {
-                                setStartTime(customTimeInput || '10:00');
+                                const parts = (customTimeInput || '08:00').split(':');
+                                const h = (parts[0] || '08').padStart(2, '0');
+                                const m = (parts[1] || '00').padStart(2, '0');
+                                const finalTime = `${h}:${m}`;
+                                setStartTime(finalTime);
+                                setCustomTimeInput(finalTime);
                                 setIsTimePickerOpen(false);
                               }}
-                              className="w-full py-3 bg-playbox-accent text-white font-bold rounded-xl text-xs shadow-md active:scale-95"
+                              className="w-full py-4 bg-gradient-to-r from-[#e2178e] via-pink-600 to-purple-600 hover:opacity-95 text-white font-bold rounded-2xl text-sm shadow-[0_4px_20px_rgba(226,23,142,0.35)] active:scale-95 transition-all"
                             >
-                              Gunakan Jam Ini ({customTimeInput || '10:00'})
+                              Simpan Jam
                             </button>
                           </div>
                         </div>
