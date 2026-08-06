@@ -118,6 +118,12 @@ export default function NewBooking() {
 
   const selectedUnit = availableUnits.find(u => u.id === selectedUnitId);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
   const getTierHours = (val: number | string, unit: string) => {
     const num = Number(val) || 0;
     if (unit === 'Bulan') return num * 720;
@@ -138,7 +144,7 @@ export default function NewBooking() {
       if (missingDocs) return alert('Semua dokumen jaminan yang dinamai wajib diunggah fotonya!');
     } else if (step === 4) {
       if (customer.requireDelivery && !customer.address.trim()) return alert('Alamat pengiriman wajib diisi!');
-      if (customer.requireDelivery && !deliveryDistance && deliveryFee === '') return alert('Jarak pengiriman wajib diisi!');
+      if (customer.requireDelivery && deliveryFee === '') return alert('Biaya atau jarak pengiriman wajib diisi!');
     }
     setStep(s => Math.min(5, s + 1));
   };
@@ -517,64 +523,87 @@ export default function NewBooking() {
                   </div>
                   
                   {isTimePickerOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                      <div className="bg-playbox-surface p-6 border border-white/10 rounded-3xl shadow-2xl relative max-w-[320px] w-full">
-                        <div className="flex justify-between items-center mb-6">
-                          <h3 className="text-white font-bold text-sm">Pilih Waktu Sewa</h3>
-                          <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors">✕</button>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+                      <div className="bg-[#0D1122]/95 p-5 sm:p-6 border border-white/15 rounded-3xl shadow-2xl relative max-w-[340px] w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
+                          <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                            <span>⏰</span> Pilih Waktu Sewa
+                          </h3>
+                          <button 
+                            type="button" 
+                            onClick={() => setIsTimePickerOpen(false)} 
+                            className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors text-sm"
+                          >
+                            ✕
+                          </button>
                         </div>
                         
-                        {/* Direct Input (Big Display) */}
-                        <div className="flex justify-center items-center space-x-3 mb-8">
-                          <input 
-                            type="text" 
-                            maxLength={2} 
-                            value={tempTime.split(':')[0]} 
-                            onChange={(e) => {
-                               let h = e.target.value.replace(/\D/g, '');
-                               if (parseInt(h) > 23) h = '23';
-                               setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
-                            }}
-                            onBlur={(e) => {
-                               let h = e.target.value;
-                               if (h.length === 1) h = '0' + h;
-                               if (h.length === 0) h = '00';
-                               setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
-                            }}
-                            className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl text-4xl text-center font-bold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
-                          />
-                          <span className="text-4xl font-bold text-white/30 pb-2">:</span>
-                          <input 
-                            type="text" 
-                            maxLength={2} 
-                            value={tempTime.split(':')[1] || '00'} 
-                            onChange={(e) => {
-                               let m = e.target.value.replace(/\D/g, '');
-                               if (parseInt(m) > 59) m = '59';
-                               setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
-                            }}
-                            onBlur={(e) => {
-                               let m = e.target.value;
-                               if (m.length === 1) m = '0' + m;
-                               if (m.length === 0) m = '00';
-                               setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
-                            }}
-                            className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl text-4xl text-center font-bold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
-                          />
+                        {/* Direct Input (Display Jam & Menit) */}
+                        <div className="flex justify-center items-center space-x-2 mb-4 bg-black/30 p-3 rounded-2xl border border-white/5">
+                          <div className="text-center">
+                            <span className="text-[10px] text-white/40 block mb-1 font-semibold uppercase">Jam</span>
+                            <input 
+                              type="text" 
+                              inputMode="numeric"
+                              maxLength={2} 
+                              value={tempTime.split(':')[0]} 
+                              onChange={(e) => {
+                                 let h = e.target.value.replace(/\D/g, '');
+                                 if (parseInt(h) > 23) h = '23';
+                                 setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
+                              }}
+                              onBlur={(e) => {
+                                 let h = e.target.value;
+                                 if (h.length === 1) h = '0' + h;
+                                 if (h.length === 0) h = '00';
+                                 setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
+                              }}
+                              className="w-16 h-14 bg-black/50 border border-white/10 rounded-xl text-3xl text-center font-black text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
+                            />
+                          </div>
+                          <span className="text-3xl font-black text-white/30 pt-4">:</span>
+                          <div className="text-center">
+                            <span className="text-[10px] text-white/40 block mb-1 font-semibold uppercase">Menit</span>
+                            <input 
+                              type="text" 
+                              inputMode="numeric"
+                              maxLength={2} 
+                              value={tempTime.split(':')[1] || '00'} 
+                              onChange={(e) => {
+                                 let m = e.target.value.replace(/\D/g, '');
+                                 if (parseInt(m) > 59) m = '59';
+                                 setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
+                              }}
+                              onBlur={(e) => {
+                                 let m = e.target.value;
+                                 if (m.length === 1) m = '0' + m;
+                                 if (m.length === 0) m = '00';
+                                 setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
+                              }}
+                              className="w-16 h-14 bg-black/50 border border-white/10 rounded-xl text-3xl text-center font-black text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
+                            />
+                          </div>
                         </div>
 
                         {/* Quick Select Grid */}
-                        <p className="text-[10px] text-white/40 text-center mb-3 uppercase tracking-widest">Pilih Cepat</p>
-                        <div className="grid grid-cols-4 gap-2 mb-6">
-                          {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
-                            <button 
-                              key={t}
-                              onClick={() => setTempTime(t)}
-                              className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10 hover:text-white'}`}
-                            >
-                              {t}
-                            </button>
-                          ))}
+                        <div className="mb-5">
+                          <p className="text-[10px] text-white/40 text-center mb-2 uppercase tracking-widest font-semibold">Pilih Cepat</p>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
+                              <button 
+                                key={t}
+                                type="button"
+                                onClick={() => setTempTime(t)}
+                                className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                                  tempTime === t 
+                                    ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' 
+                                    : 'bg-white/5 border-transparent text-white/70 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
                         <button 
@@ -583,9 +612,9 @@ export default function NewBooking() {
                             setSchedule({...schedule, time: tempTime});
                             setIsTimePickerOpen(false);
                           }}
-                          className="w-full py-4 bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(226,23,142,0.3)] hover:scale-[1.02] transition-transform"
+                          className="w-full py-3.5 bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(226,23,142,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all text-sm"
                         >
-                          Simpan Jam
+                          Simpan Jam ({tempTime})
                         </button>
                       </div>
                     </div>
@@ -755,13 +784,24 @@ export default function NewBooking() {
                         </button>
                       </div>
                     </div>
-                    <div className="mt-2 space-y-1">
-                      {matchedRuleText && (
-                        <p className="text-[10px] text-playbox-accent font-medium">{matchedRuleText}</p>
-                      )}
-                      <p className="text-[11px] text-white/80 font-bold bg-white/5 p-2 rounded-lg border border-white/5 inline-block w-full">
-                        Total Ongkir: {(deliveryFee !== '') ? `Rp ${Number(deliveryFee).toLocaleString('id-ID')}` : 'Belum dihitung'}
-                      </p>
+                    <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[11px] font-medium text-playbox-text-secondary uppercase tracking-wider">Total Biaya Ongkir (Rp)</label>
+                        {matchedRuleText && (
+                          <span className="text-[10px] text-playbox-accent font-semibold">{matchedRuleText}</span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm font-semibold">Rp</span>
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={deliveryFee !== '' ? Number(deliveryFee).toLocaleString('id-ID') : ''} 
+                          onChange={e => handlePriceChange(e.target.value, 'deliveryFee')} 
+                          className="w-full p-3.5 pl-12 rounded-xl bg-black/20 border border-white/10 text-white text-sm font-bold focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20" 
+                          placeholder="0" 
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

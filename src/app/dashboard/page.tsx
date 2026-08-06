@@ -183,14 +183,21 @@ export default function DashboardHome() {
       let cData = [0, 0, 0, 0, 0, 0, 0];
       bookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
-          let bDate = new Date();
+          let bDate: Date | null = null;
           if (b.isoStart || b.startTime) {
             bDate = new Date(b.isoStart || b.startTime);
           } else if (b.createdAt) {
             bDate = new Date(b.createdAt);
+          } else if (b.time) {
+            const parts = b.time.split(', ');
+            if (parts.length >= 1) {
+              bDate = new Date(parts[0]);
+            }
           }
+          if (!bDate || isNaN(bDate.getTime())) bDate = new Date();
+
           bDate.setHours(0, 0, 0, 0);
-          const diffDays = Math.floor((today.getTime() - bDate.getTime()) / (1000 * 3600 * 24));
+          const diffDays = Math.round((today.getTime() - bDate.getTime()) / (1000 * 3600 * 24));
           if (diffDays >= 0 && diffDays < 7) {
              cData[6 - diffDays] += (Number(b.totalPrice) || 0);
           }
@@ -313,7 +320,7 @@ export default function DashboardHome() {
           
           <div className="flex justify-between items-end">
             <div>
-              <p className="text-3xl font-black tracking-tight text-white">Rp {revenue.toLocaleString('id-ID')}</p>
+              <p className="text-3xl font-black tracking-tight text-white">Rp {todayRev.toLocaleString('id-ID')}</p>
               
               <div className="flex items-center mt-2">
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded mr-2 flex items-center ${

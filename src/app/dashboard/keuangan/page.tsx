@@ -30,6 +30,7 @@ export default function Keuangan() {
   const [data, setData] = useState<{
     pendapatan: number;
     pendapatanTren: number;
+    trenLabel: string;
     rental: number;
     delivery: number;
     denda: number;
@@ -37,6 +38,7 @@ export default function Keuangan() {
   }>({
     pendapatan: 0,
     pendapatanTren: 0,
+    trenLabel: 'dari kemarin',
     rental: 0,
     delivery: 0,
     denda: 0,
@@ -61,6 +63,17 @@ export default function Keuangan() {
     loadFinancialData();
 
     // Setup Real-Time Listeners for Bookings and Expenses
+    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudBookings: any[] = [];
+        snapshot.forEach((d) => {
+          cloudBookings.push({ id: d.id, ...d.data() });
+        });
+        localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
+        loadFinancialData();
+      }
+    }, (err) => console.warn('Bookings listener fallback:', err));
+
     const unsubscribeExpenses = onSnapshot(collection(db, 'expenses'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudExpenses: any[] = [];
@@ -74,6 +87,7 @@ export default function Keuangan() {
     }, (err) => console.warn('Expenses listener fallback:', err));
 
     return () => {
+      unsubscribeBookings();
       unsubscribeExpenses();
     };
   }, [router, period, selectedDate]);
@@ -81,59 +95,99 @@ export default function Keuangan() {
   const loadFinancialData = async () => {
     const savedBookings = localStorage.getItem('playbox_mock_bookings');
     let totalPendapatan = 0;
+    let prevPendapatan = 0;
     let totalRental = 0;
     let totalDelivery = 0;
     let totalDenda = 0;
 
-    const filterBooking = (b: any) => {
-      if (!b.isoStart && !b.createdAt) return true;
-      const bDate = new Date(b.isoStart || b.createdAt);
-      const now = new Date();
-      
-      if (period === 'Hari Ini') {
-        return bDate.getDate() === now.getDate() && bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear();
+    const filterBookingPeriod = (b: any, isPrevious: boolean = false) => {
+      let bDate: Date | null = null;
+      if (b.isoStart || b.startTime) {
+        bDate = new Date(b.isoStart || b.startTime);
+      } else if (b.createdAt) {
+        bDate = new Date(b.createdAt);
+      } else if (b.time) {
+        const parts = b.time.split(', ');
+        if (parts.length >= 1) bDate = new Date(parts[0]);
       }
+      if (!bDate || isNaN(bDate.getTime())) bDate = new Date();
+      
+      const now = new Date();
+
+      if (period === 'Hari Ini') {
+        const target = isPrevious ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1) : now;
+        return bDate.getDate() === target.getDate() && bDate.getMonth() === target.getMonth() && bDate.getFullYear() === target.getFullYear();
+      }
+
       if (period === 'Minggu Ini') {
         const day = now.getDay();
         const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
         const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
         startOfWeek.setHours(0, 0, 0, 0);
-        
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23, 59, 59, 999);
 
-        return bDate.getTime() >= startOfWeek.getTime() && bDate.getTime() <= endOfWeek.getTime();
+        if (isPrevious) {
+          const startOfLastWeek = new Date(startOfWeek);
+          startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+          const endOfLastWeek = new Date(startOfWeek.getTime() - 1);
+          return bDate.getTime() >= startOfLastWeek.getTime() && bDate.getTime() <= endOfLastWeek.getTime();
+        } else {
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          endOfWeek.setHours(23, 59, 59, 999);
+          return bDate.getTime() >= startOfWeek.getTime() && bDate.getTime() <= endOfWeek.getTime();
+        }
       }
+
       if (period === 'Bulan Ini') {
-        return bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear();
+        const targetMonth = isPrevious ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : now;
+        return bDate.getMonth() === targetMonth.getMonth() && bDate.getFullYear() === targetMonth.getFullYear();
       }
+
       if (selectedDate) {
-        return bDate.getDate() === selectedDate.getDate() && bDate.getMonth() === selectedDate.getMonth() && bDate.getFullYear() === selectedDate.getFullYear();
+        const target = isPrevious ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1) : selectedDate;
+        return bDate.getDate() === target.getDate() && bDate.getMonth() === target.getMonth() && bDate.getFullYear() === target.getFullYear();
       }
+
       return true;
     };
 
     if (savedBookings) {
       const bookings = JSON.parse(savedBookings);
       bookings.forEach((b: any) => {
-        if ((b.status === 'Selesai' || b.paymentStatus === 'Lunas') && filterBooking(b)) {
-          const tDenda = b.fines ? (
-            Number(b.fines.totalLateFine || 0) + 
-            Number(b.fines.totalDamageFine || 0) + 
-            Number(b.fines.totalInternalFine || 0)
-          ) : 0;
+        if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
+          if (filterBookingPeriod(b, false)) {
+            const tDenda = b.fines ? (
+              Number(b.fines.totalLateFine || 0) + 
+              Number(b.fines.totalDamageFine || 0) + 
+              Number(b.fines.totalInternalFine || 0)
+            ) : 0;
 
-          const tPrice = Number(b.totalPrice) || 0;
-          const tDelivery = b.requireDelivery ? Number(b.deliveryFee) || 0 : 0;
-          
-          totalPendapatan += tPrice; 
-          totalDelivery += tDelivery;
-          totalRental += (tPrice - tDelivery - tDenda);
-          totalDenda += tDenda;
+            const tPrice = Number(b.totalPrice) || 0;
+            const tDelivery = b.requireDelivery ? Number(b.deliveryFee) || 0 : 0;
+            
+            totalPendapatan += tPrice; 
+            totalDelivery += tDelivery;
+            totalRental += (tPrice - tDelivery - tDenda);
+            totalDenda += tDenda;
+          }
+          if (filterBookingPeriod(b, true)) {
+            prevPendapatan += Number(b.totalPrice) || 0;
+          }
         }
       });
     }
+
+    let tren = 0;
+    if (prevPendapatan > 0) {
+      tren = Math.round(((totalPendapatan - prevPendapatan) / prevPendapatan) * 100);
+    } else if (totalPendapatan > 0) {
+      tren = 100;
+    }
+
+    let trenLabel = 'dari kemarin';
+    if (period === 'Minggu Ini') trenLabel = 'dari minggu lalu';
+    else if (period === 'Bulan Ini') trenLabel = 'dari bulan lalu';
+    else if (selectedDate) trenLabel = 'dari H-1';
 
     // Load Expenses
     let savedExpenses: any[] = [];
@@ -157,7 +211,8 @@ export default function Keuangan() {
       rental: totalRental,
       delivery: totalDelivery,
       denda: totalDenda,
-      pendapatanTren: totalPendapatan > 0 ? 12.5 : 0,
+      pendapatanTren: tren,
+      trenLabel: trenLabel,
       pengeluaranItems: savedExpenses
     });
   };
@@ -290,10 +345,14 @@ export default function Keuangan() {
         <div className="flex flex-col">
           <p className="text-3xl font-black text-white tracking-tight">Rp {data.pendapatan.toLocaleString('id-ID')}</p>
           <div className="flex items-center mt-2 space-x-2">
-            <span className="bg-[#25D366]/20 text-[#25D366] text-xs px-2 py-0.5 rounded font-bold tracking-wide border border-[#25D366]/30">
-              ▲ {data.pendapatanTren}%
+            <span className={`text-xs px-2 py-0.5 rounded font-bold tracking-wide border ${
+              data.pendapatanTren > 0 ? 'bg-[#25D366]/20 text-[#25D366] border-[#25D366]/30' :
+              data.pendapatanTren < 0 ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+              'bg-white/10 text-white/60 border-white/10'
+            }`}>
+              {data.pendapatanTren > 0 ? `▲ +${data.pendapatanTren}%` : data.pendapatanTren < 0 ? `▼ ${data.pendapatanTren}%` : `0%`}
             </span>
-            <span className="text-[11px] text-playbox-text-secondary">vs periode lalu</span>
+            <span className="text-[11px] text-playbox-text-secondary">{data.trenLabel}</span>
           </div>
         </div>
         
