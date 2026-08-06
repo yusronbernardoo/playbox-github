@@ -2,12 +2,15 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export default function LainnyaPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>('');
   const [username, setUsername] = useState<string>('');
   const [shopName, setShopName] = useState<string>('PlayBox Malang');
+  const [shopLogo, setShopLogo] = useState<string>('');
 
   useEffect(() => {
     const authData = localStorage.getItem('playbox_auth');
@@ -16,10 +19,30 @@ export default function LainnyaPage() {
       setRole(parsed.role);
       setUsername(parsed.username);
     }
+    
     const shopSettings = localStorage.getItem('playbox_shop_settings');
     if (shopSettings) {
-      setShopName(JSON.parse(shopSettings).brandName);
+      try {
+        const parsed = JSON.parse(shopSettings);
+        if (parsed.brandName) setShopName(parsed.brandName);
+        if (parsed.logo) setShopLogo(parsed.logo);
+      } catch {}
     }
+
+    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.brandName) {
+          setShopName(data.brandName);
+        }
+        if (data.logo !== undefined) {
+          setShopLogo(data.logo);
+        }
+        localStorage.setItem('playbox_shop_settings', JSON.stringify(data));
+      }
+    });
+
+    return () => unsubscribeShop();
   }, []);
 
   const handleLogout = () => {
@@ -35,12 +58,20 @@ export default function LainnyaPage() {
       </div>
 
       {/* Profil Bisnis */}
-      <div className="bg-playbox-surface p-4 rounded-xl border border-[#2A3455] flex items-center space-x-4">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-white text-2xl font-bold uppercase shadow-[0_4px_20px_rgba(226,23,142,0.3)]">
-          {shopName.charAt(0)}
-        </div>
-        <div>
-          <h2 className="font-bold text-lg">{role === 'owner' ? shopName : `Kasir: ${username}`}</h2>
+      <div className="bg-playbox-surface p-4 rounded-2xl border border-[#2A3455] flex items-center space-x-4">
+        {shopLogo ? (
+          <img 
+            src={shopLogo} 
+            alt="Logo Toko" 
+            className="w-16 h-16 rounded-full object-cover border-2 border-playbox-accent shadow-[0_4px_20px_rgba(226,23,142,0.3)] bg-black/40 flex-shrink-0"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-white text-2xl font-bold uppercase shadow-[0_4px_20px_rgba(226,23,142,0.3)] flex-shrink-0">
+            {shopName.charAt(0) || 'P'}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold text-lg truncate text-white">{role === 'owner' ? shopName : `Kasir: ${username}`}</h2>
           <p className="text-sm text-playbox-text-secondary">{role === 'owner' ? 'SaaS PRO Tier' : 'Akses Terbatas'}</p>
         </div>
       </div>

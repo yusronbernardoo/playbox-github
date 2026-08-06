@@ -21,6 +21,7 @@ export default function UnitNew() {
 
   // Dropdown states
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [openUnitTierDropdown, setOpenUnitTierDropdown] = useState<number | null>(null);
 
   const handleAddItem = () => setPackageItems([...packageItems, '']);
   const handleItemChange = (idx: number, val: string) => {
@@ -182,11 +183,11 @@ export default function UnitNew() {
         </div>
 
         {/* Harga Sewa */}
-        <div className="glass-surface p-6 rounded-3xl space-y-4">
+        <div className="glass-surface p-6 rounded-3xl space-y-4 relative z-10">
           <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">Harga Sewa Per Durasi</h2>
           
           {priceTiers.map((tier, idx) => (
-            <div key={idx} className="flex space-x-2">
+            <div key={idx} className="flex space-x-2 items-center">
               <input 
                 type="number"
                 min="1"
@@ -197,17 +198,47 @@ export default function UnitNew() {
                 required
               />
               <div className="relative">
-                <select
-                  value={tier.durationUnit || 'Jam'}
-                  onChange={e => handleTierChange(idx, 'durationUnit', e.target.value)}
-                  className="w-24 p-4 rounded-xl bg-black/30 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all cursor-pointer font-bold appearance-none text-center pr-6 hover:border-white/20"
+                <button
+                  type="button"
+                  onClick={() => setOpenUnitTierDropdown(openUnitTierDropdown === idx ? null : idx)}
+                  className={`w-28 p-4 rounded-xl bg-black/30 border text-white text-sm flex items-center justify-between transition-all font-bold ${
+                    openUnitTierDropdown === idx ? 'border-playbox-accent shadow-[0_0_12px_rgba(226,23,142,0.35)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'
+                  }`}
                 >
-                  <option value="Jam" className="bg-[#10152B] text-white">Jam</option>
-                  <option value="Hari" className="bg-[#10152B] text-white">Hari</option>
-                  <option value="Minggu" className="bg-[#10152B] text-white">Minggu</option>
-                  <option value="Bulan" className="bg-[#10152B] text-white">Bulan</option>
-                </select>
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/40 pointer-events-none">▼</span>
+                  <span className="truncate">{tier.durationUnit || 'Jam'}</span>
+                  <span className={`text-[9px] text-playbox-accent transition-transform duration-300 ${openUnitTierDropdown === idx ? 'rotate-180' : 'opacity-60'}`}>▼</span>
+                </button>
+
+                {openUnitTierDropdown === idx && (
+                  <div className="absolute top-full left-0 w-36 mt-2 bg-[#0D1122]/95 border border-white/15 rounded-2xl overflow-hidden shadow-2xl z-50 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
+                    {[
+                      { label: 'Jam', icon: '⏱️' },
+                      { label: 'Hari', icon: '📅' },
+                      { label: 'Minggu', icon: '📆' },
+                      { label: 'Bulan', icon: '🌙' }
+                    ].map((u) => {
+                      const isSelected = (tier.durationUnit || 'Jam') === u.label;
+                      return (
+                        <div
+                          key={u.label}
+                          onClick={() => {
+                            handleTierChange(idx, 'durationUnit', u.label);
+                            setOpenUnitTierDropdown(null);
+                          }}
+                          className={`p-3 text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                            isSelected ? 'bg-playbox-accent/15 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>{u.icon}</span>
+                            <span>{u.label}</span>
+                          </span>
+                          {isSelected && <span className="text-[10px] text-playbox-accent font-black">✓</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="flex-1 relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm">Rp</span>
