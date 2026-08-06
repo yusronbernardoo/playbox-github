@@ -36,15 +36,15 @@ export default function DashboardHome() {
     const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        if (d.brandName) setBusinessName(d.brandName);
-        if (d.logo) setShopLogo(d.logo);
+        if (d.brandName !== undefined) setBusinessName(d.brandName);
+        if (d.logo !== undefined) setShopLogo(d.logo);
       } else {
         const local = localStorage.getItem('playbox_shop_settings');
         if (local) {
           try {
             const parsed = JSON.parse(local);
-            if (parsed.brandName) setBusinessName(parsed.brandName);
-            if (parsed.logo) setShopLogo(parsed.logo);
+            if (parsed.brandName !== undefined) setBusinessName(parsed.brandName);
+            if (parsed.logo !== undefined) setShopLogo(parsed.logo);
           } catch {}
         }
       }

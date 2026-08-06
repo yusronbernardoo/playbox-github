@@ -32,7 +32,7 @@ export default function LainnyaPage() {
     const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.brandName) {
+        if (data.brandName !== undefined) {
           setShopName(data.brandName);
         }
         if (data.logo !== undefined) {
