@@ -13,6 +13,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const unwrappedParams = use(params);
   const [units, setUnits] = useState<any[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
+  const [selectedTierIndex, setSelectedTierIndex] = useState(0);
   
   // Form State
   const [customerName, setCustomerName] = useState('');
@@ -44,6 +45,30 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     bio?: string;
     logo?: string;
   }>({});
+
+  // Helper functions for Dynamic Price Tiers
+  const getUnitTiers = (unit: any) => {
+    if (unit?.priceTiers && Array.isArray(unit.priceTiers) && unit.priceTiers.length > 0) {
+      return unit.priceTiers;
+    }
+    return [{ durationVal: 24, durationUnit: 'Jam', price: unit?.price || 150000 }];
+  };
+
+  const getTierHours = (tier: any) => {
+    const val = Number(tier?.durationVal) || 24;
+    const unit = (tier?.durationUnit || 'Jam').toLowerCase();
+    if (unit.includes('minggu')) return val * 168;
+    if (unit.includes('hari')) return val * 24;
+    return val;
+  };
+
+  const getTierLabel = (tier: any) => {
+    if (!tier) return '24 Jam';
+    return `${tier.durationVal} ${tier.durationUnit || 'Jam'}`;
+  };
+
+  const currentTiers = selectedUnit ? getUnitTiers(selectedUnit) : [];
+  const activeTier = currentTiers[selectedTierIndex] || currentTiers[0] || { durationVal: 24, durationUnit: 'Jam', price: selectedUnit?.price || 0 };
 
   // Helper to compress image down to ~30-50KB using Canvas
   const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<string> => {
@@ -235,17 +260,17 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       const randomInv = Math.floor(100000 + Math.random() * 900000);
       const invoiceCode = `INV-${randomInv}`;
 
-      const totalDays = duration / 24;
-      const basePrice = duration === 12 ? Math.round(selectedUnit.price * 0.6) : selectedUnit.price * (duration / 24);
-      const calculatedTotalPrice = basePrice;
+      const activeHours = getTierHours(activeTier);
+      const calculatedTotalPrice = Number(activeTier.price || selectedUnit.price || 0);
 
       const formattedStartDate = format(new Date(startDate), 'yyyy-MM-dd');
       const isoStartDateTime = `${formattedStartDate}T${startTime}:00`;
       const startDateTimeObj = new Date(isoStartDateTime);
-      const endDateTimeObj = new Date(startDateTimeObj.getTime() + duration * 60 * 60 * 1000);
+      const endDateTimeObj = new Date(startDateTimeObj.getTime() + activeHours * 60 * 60 * 1000);
       const isoEndDateTime = endDateTimeObj.toISOString();
 
-      const timeDisplay = `${formattedStartDate}, ${startTime} (${duration === 12 ? '12 Jam' : duration === 168 ? '1 Minggu' : `${duration/24} Hari`})`;
+      const tierLabel = getTierLabel(activeTier);
+      const timeDisplay = `${formattedStartDate}, ${startTime} (${tierLabel})`;
 
       const newBooking = {
         id: newId,
@@ -261,8 +286,9 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         endTime: isoEndDateTime,
         isoStart: isoStartDateTime,
         isoEnd: isoEndDateTime,
-        duration: duration,
-        durationHours: duration,
+        duration: activeHours,
+        durationHours: activeHours,
+        durationLabel: tierLabel,
         status: 'Perlu Verifikasi',
         statusColor: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
         paymentStatus: 'Belum Lunas',
@@ -271,7 +297,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         address: address,
         deliveryAddress: address,
         totalPrice: calculatedTotalPrice,
-        unitPrice: selectedUnit.price,
+        unitPrice: calculatedTotalPrice,
         deliveryFee: 0,
         ktpPhoto: ktpDataUrl,
         ktpUrl: ktpDataUrl,
@@ -307,6 +333,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const handleCloseModal = () => {
     setShowSuccess(false);
     setSelectedUnit(null);
+    setSelectedTierIndex(0);
     setSubmittedBooking(null);
     setCustomerName('');
     setCustomerPhone('');
@@ -416,11 +443,19 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                 
                 <div className="flex justify-between items-end mt-2 pt-1 border-t border-white/5">
                   <div>
-                    <p className="text-[9px] uppercase tracking-wider text-white/40 font-semibold">Tarif / 24 Jam</p>
-                    <p className="text-xs font-black text-white">Rp {(unit.price || 0).toLocaleString('id-ID')}</p>
+                    <p className="text-[9px] uppercase tracking-wider text-white/40 font-semibold">Mulai Dari</p>
+                    <p className="text-xs font-black text-white">
+                      Rp {Number(unit.priceTiers?.[0]?.price || unit.price || 0).toLocaleString('id-ID')}
+                      <span className="text-[9px] font-normal text-white/50 ml-1">
+                        / {unit.priceTiers?.[0]?.durationVal ? `${unit.priceTiers[0].durationVal} ${unit.priceTiers[0].durationUnit || 'Jam'}` : '24j'}
+                      </span>
+                    </p>
                   </div>
                   <button 
-                    onClick={() => setSelectedUnit(unit)}
+                    onClick={() => {
+                      setSelectedUnit(unit);
+                      setSelectedTierIndex(0);
+                    }}
                     disabled={unit.status !== 'Ready'}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                       unit.status === 'Ready' 
@@ -507,20 +542,38 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
               <div className="p-4 overflow-y-auto flex-1 space-y-4">
                 <form id="booking-form" onSubmit={handleSubmit} className="space-y-4">
                   
-                  {/* Durasi Sewa */}
+                  {/* Durasi Sewa Dinamis dari Price Tiers */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1.5">Durasi Sewa</label>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[12, 24, 48, 72].map(h => (
-                        <button 
-                          key={h}
-                          type="button"
-                          onClick={() => setDuration(h)}
-                          className={`py-2 rounded-xl border text-[11px] font-bold transition-all ${duration === h ? 'bg-playbox-accent/20 border-playbox-accent text-playbox-accent shadow-sm' : 'bg-black/30 border-white/5 text-white/60 hover:bg-white/5'}`}
-                        >
-                          {h === 12 ? '12 Jam' : `${h/24} Hari`}
-                        </button>
-                      ))}
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider">Pilihan Durasi Sewa</label>
+                      <span className="text-[10px] text-playbox-accent font-bold">Pilih Paket</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {currentTiers.map((t: any, idx: number) => {
+                        const isSelected = selectedTierIndex === idx;
+                        return (
+                          <button 
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedTierIndex(idx)}
+                            className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                              isSelected 
+                                ? 'bg-playbox-accent/20 border-playbox-accent text-white shadow-[0_0_15px_rgba(226,23,142,0.35)] ring-1 ring-playbox-accent' 
+                                : 'bg-black/30 border-white/10 text-white/70 hover:bg-white/5'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className={`text-xs font-bold ${isSelected ? 'text-playbox-accent' : 'text-white'}`}>
+                                ⏱️ {getTierLabel(t)}
+                              </span>
+                              {isSelected && <span className="text-[10px] text-playbox-accent font-bold">✔️</span>}
+                            </div>
+                            <p className="text-xs font-black text-playbox-ready mt-1.5">
+                              Rp {Number(t.price || 0).toLocaleString('id-ID')}
+                            </p>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -850,14 +903,26 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     </div>
                   )}
 
+                  {/* Rincian Biaya Transparan */}
+                  <div className="p-3.5 bg-black/40 border border-white/10 rounded-2xl flex justify-between items-center shadow-inner">
+                    <div>
+                      <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider block">Total Biaya Unit</span>
+                      <p className="text-xs text-white/90 font-bold mt-0.5">Paket {getTierLabel(activeTier)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-base font-black text-playbox-ready">Rp {Number(activeTier.price || 0).toLocaleString('id-ID')}</p>
+                      {requireDelivery && <p className="text-[9px] text-playbox-accent font-semibold">+ Ongkir dihitung admin</p>}
+                    </div>
+                  </div>
+
                   {/* Submit Button */}
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <button 
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(226,23,142,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-xs flex items-center justify-center"
+                      className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(226,23,142,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-xs flex items-center justify-center gap-1.5"
                     >
-                      {isSubmitting ? 'Memproses Booking...' : `Konfirmasi Booking (${duration === 12 ? '12 Jam' : `${duration/24} Hari`}) →`}
+                      {isSubmitting ? 'Memproses Booking...' : `Konfirmasi Booking (${getTierLabel(activeTier)} - Rp ${Number(activeTier.price || 0).toLocaleString('id-ID')}) →`}
                     </button>
                   </div>
                 </form>

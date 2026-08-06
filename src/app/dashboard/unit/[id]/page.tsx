@@ -138,28 +138,6 @@ export default function UnitDetail() {
             </div>
           </div>
         )}
-
-        {/* History / Info Lain */}
-        <div className="glass-surface p-6 rounded-3xl">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest">Riwayat Terakhir</h2>
-            <Link href="#" className="text-xs text-playbox-accent hover:underline">Lihat Semua</Link>
-          </div>
-          
-          {unit.status === 'Disewa' ? (
-            <div className="flex justify-between items-center py-3 border-b border-white/5">
-              <div>
-                <p className="text-sm font-semibold text-white/90">Budi Santoso</p>
-                <p className="text-xs text-playbox-text-secondary">Sewa 24 Jam</p>
-              </div>
-              <span className="text-xs text-playbox-accent bg-playbox-accent/10 px-2.5 py-1 rounded-full font-medium">Sedang Jalan</span>
-            </div>
-          ) : (
-             <div className="py-4 text-center">
-               <p className="text-sm text-playbox-text-secondary">Belum ada riwayat aktif.</p>
-             </div>
-          )}
-        </div>
       </div>
 
       {/* Sticky Bottom Actions */}
