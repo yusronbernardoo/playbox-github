@@ -57,6 +57,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const getTierHours = (tier: any) => {
     const val = Number(tier?.durationVal) || 24;
     const unit = (tier?.durationUnit || 'Jam').toLowerCase();
+    if (unit.includes('bulan')) return val * 720;
     if (unit.includes('minggu')) return val * 168;
     if (unit.includes('hari')) return val * 24;
     return val;

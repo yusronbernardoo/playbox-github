@@ -94,21 +94,22 @@ export default function UnitDetail() {
           <h1 className="text-2xl font-bold tracking-tight text-white mb-1">{unit.name}</h1>
           <p className="text-sm text-playbox-text-secondary">{unit.type}</p>
           
-          <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-5">
-            <div>
-              <p className="text-xs text-playbox-text-secondary uppercase tracking-wider mb-1">Harga Sewa</p>
+          <div className="mt-6 border-t border-white/5 pt-5">
+            <p className="text-xs text-playbox-text-secondary uppercase tracking-wider mb-2">Daftar Paket Harga Sewa</p>
+            {unit.priceTiers && unit.priceTiers.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {unit.priceTiers.map((t: any, idx: number) => (
+                  <div key={idx} className="bg-white/5 p-3 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <span className="text-xs text-white/80 font-semibold">⏱️ {t.durationVal} {t.durationUnit || 'Jam'}</span>
+                    <span className="text-xs font-black text-playbox-ready">Rp {Number(t.price || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
               <p className="text-2xl font-bold text-white tracking-tight">
-                  {unit.priceTiers && unit.priceTiers.length > 0 ? (
-                    <>
-                      Rp {(unit.priceTiers[0].price || 0).toLocaleString('id-ID')} <span className="text-sm font-normal text-playbox-text-secondary">/ {unit.priceTiers[0].durationVal} {unit.priceTiers[0].durationUnit}</span>
-                    </>
-                  ) : (
-                    <>
-                      Rp {(unit.price || 0).toLocaleString('id-ID')} <span className="text-sm font-normal text-playbox-text-secondary">/ 24j</span>
-                    </>
-                  )}
+                Rp {(unit.price || 0).toLocaleString('id-ID')} <span className="text-sm font-normal text-playbox-text-secondary">/ 24j</span>
               </p>
-            </div>
+            )}
           </div>
         </div>
 

@@ -289,11 +289,21 @@ export default function EditUnit() {
                 value={tier.durationVal}
                 onChange={e => handleTierChange(idx, 'durationVal', parseInt(e.target.value) || '')}
                 placeholder="Angka"
-                className="w-20 p-4 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 text-center"
+                className="w-20 p-4 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 text-center font-bold"
                 required
               />
-              <div className="w-16 p-4 rounded-xl bg-black/40 border border-white/5 text-white/50 text-sm flex items-center justify-center cursor-not-allowed">
-                <span>Jam</span>
+              <div className="relative">
+                <select
+                  value={tier.durationUnit || 'Jam'}
+                  onChange={e => handleTierChange(idx, 'durationUnit', e.target.value)}
+                  className="w-24 p-4 rounded-xl bg-black/30 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all cursor-pointer font-bold appearance-none text-center pr-6 hover:border-white/20"
+                >
+                  <option value="Jam" className="bg-[#10152B] text-white">Jam</option>
+                  <option value="Hari" className="bg-[#10152B] text-white">Hari</option>
+                  <option value="Minggu" className="bg-[#10152B] text-white">Minggu</option>
+                  <option value="Bulan" className="bg-[#10152B] text-white">Bulan</option>
+                </select>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/40 pointer-events-none">▼</span>
               </div>
               <div className="flex-1 relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm">Rp</span>
@@ -303,7 +313,7 @@ export default function EditUnit() {
                   value={tier.price ? Number(tier.price).toLocaleString('id-ID') : ''}
                   onChange={e => handleTierChange(idx, 'price', e.target.value)}
                   placeholder="Mis: 150.000"
-                  className="w-full p-4 pl-12 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20"
+                  className="w-full p-4 pl-12 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20 font-bold"
                   required
                 />
               </div>
