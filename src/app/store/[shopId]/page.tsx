@@ -6,7 +6,7 @@ import 'react-day-picker/dist/style.css';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export default function StorefrontPage({ params }: { params: Promise<{ shopId: string }> }) {
   const router = useRouter();
@@ -19,10 +19,10 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const [customerPhone, setCustomerPhone] = useState('');
   const [duration, setDuration] = useState(24);
   const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
+  const [startTime, setStartTime] = useState('10:00');
+  const [customTimeInput, setCustomTimeInput] = useState('10:00');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-  const [tempTime, setTempTime] = useState('08:00');
   const [ktpFileName, setKtpFileName] = useState('');
   const [ktpDataUrl, setKtpDataUrl] = useState('');
   const [paymentProofFileName, setPaymentProofFileName] = useState('');
@@ -45,74 +45,59 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   }>({});
 
   useEffect(() => {
-    const fetchStoreData = async () => {
-      // Dynamic SaaS Loading: Get settings from Firestore first, then localStorage
+    // 1. Real-time Shop Profile Listener
+    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
       let loadedProfile: any = null;
-      try {
-        const snap = await getDoc(doc(db, 'settings', 'shop'));
-        if (snap.exists()) {
-          loadedProfile = snap.data();
-        }
-      } catch (e) {
-        console.warn('Firestore shop settings fallback in store:', e);
+      if (snap.exists()) {
+        loadedProfile = snap.data();
+      } else {
+        const local = localStorage.getItem('playbox_shop_settings');
+        if (local) loadedProfile = JSON.parse(local);
       }
 
-      if (!loadedProfile) {
-        const settings = localStorage.getItem('playbox_shop_settings');
-        if (settings) {
-          loadedProfile = JSON.parse(settings);
-        }
-      }
-
-      let loadedBrand = loadedProfile?.brandName || '';
-      
-      // Fallback if not found, just format the slug nicely
-      if (!loadedBrand) {
-        loadedBrand = unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      }
-      
-      setDisplayShopName(loadedBrand);
       if (loadedProfile) {
         setShopProfile(loadedProfile);
-      }
-      
-      // Fetch units from local storage initially
-      const savedUnits = localStorage.getItem('playbox_mock_units');
-      if (savedUnits) {
-        setUnits(JSON.parse(savedUnits));
+        setDisplayShopName(loadedProfile.brandName || unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       } else {
-        const defaultUnits = [
-          {
-            id: 'U01', name: 'PS5 Premium Set (#01)', type: 'PlayStation 5', status: 'Ready', price: 150000, 
-            image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=500&q=80',
-            specs: ['2 Stik', 'FIFA 24', 'GTA V']
-          }
-        ];
-        setUnits(defaultUnits);
+        setDisplayShopName(unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
+    }, (err) => {
+      console.warn('Shop profile realtime sync error:', err);
+    });
 
-      // Fetch payment methods
-      const savedPayments = localStorage.getItem('playbox_payments');
-      if (savedPayments) {
-        const parsed = JSON.parse(savedPayments);
-        setPaymentMethods(parsed.filter((p: any) => p.active));
-      }
-    };
-
-    fetchStoreData();
-
-    // Setup Realtime Listener for Units Availability
+    // 2. Real-time Units Listener
     const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
       if (!snapshot.empty) {
         const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setUnits(liveUnits);
         localStorage.setItem('playbox_mock_units', JSON.stringify(liveUnits));
+      } else {
+        const savedUnits = localStorage.getItem('playbox_mock_units');
+        if (savedUnits) {
+          setUnits(JSON.parse(savedUnits));
+        } else {
+          setUnits([
+            {
+              id: 'U01', name: 'PS5 Premium Set (#01)', type: 'PlayStation 5', status: 'Ready', price: 150000, 
+              image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=500&q=80',
+              specs: ['2 Stik Original', 'FIFA 24', 'GTA V', 'God of War']
+            }
+          ]);
+        }
       }
-    }, (error) => {
-      console.warn('Units realtime listener fallback in store:', error);
     });
 
-    return () => unsubscribeUnits();
+    // 3. Payment Methods
+    const savedPayments = localStorage.getItem('playbox_payments');
+    if (savedPayments) {
+      const parsed = JSON.parse(savedPayments);
+      setPaymentMethods(parsed.filter((p: any) => p.active));
+    }
+
+    return () => {
+      unsubscribeShop();
+      unsubscribeUnits();
+    };
   }, [unwrappedParams.shopId]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,16 +142,20 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       const savedBookings = localStorage.getItem('playbox_mock_bookings');
       const bookings = savedBookings ? JSON.parse(savedBookings) : [];
       
-      const newId = `B0${bookings.length + 1}`;
+      const newId = `B0${Date.now().toString().slice(-4)}`;
       const randomInv = Math.floor(100000 + Math.random() * 900000);
       const invoiceCode = `INV-${randomInv}`;
 
       const totalDays = duration / 24;
-      const basePrice = selectedUnit.price * totalDays;
+      const basePrice = duration === 12 ? Math.round(selectedUnit.price * 0.6) : selectedUnit.price * (duration / 24);
       const calculatedTotalPrice = basePrice;
 
       const formattedStartDate = format(new Date(startDate), 'yyyy-MM-dd');
       const isoStartDateTime = `${formattedStartDate}T${startTime}:00`;
+      const startDateTimeObj = new Date(isoStartDateTime);
+      const endDateTimeObj = new Date(startDateTimeObj.getTime() + duration * 60 * 60 * 1000);
+      const isoEndDateTime = endDateTimeObj.toISOString();
+
       const timeDisplay = `${formattedStartDate}, ${startTime} (${duration === 12 ? '12 Jam' : duration === 168 ? '1 Minggu' : `${duration/24} Hari`})`;
 
       const newBooking = {
@@ -177,18 +166,28 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         unit: selectedUnit.name,
         unitId: selectedUnit.id,
         time: timeDisplay,
+        date: formattedStartDate,
+        startDate: formattedStartDate,
+        startTime: isoStartDateTime,
+        endTime: isoEndDateTime,
         isoStart: isoStartDateTime,
+        isoEnd: isoEndDateTime,
         duration: duration,
+        durationHours: duration,
         status: 'Perlu Verifikasi',
         statusColor: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
         paymentStatus: 'Belum Lunas',
         deliveryStatus: requireDelivery ? 'Diantar (+Ongkir)' : 'Ambil di Toko',
         requireDelivery: requireDelivery,
         address: address,
+        deliveryAddress: address,
         totalPrice: calculatedTotalPrice,
         unitPrice: selectedUnit.price,
         deliveryFee: 0,
+        ktpPhoto: ktpDataUrl,
         ktpUrl: ktpDataUrl,
+        documents: [{ title: 'KTP Asli', file: ktpDataUrl }],
+        paymentProof: paymentProofDataUrl || null,
         paymentProofUrl: paymentProofDataUrl || null,
         needAction: true,
         fines: null,
@@ -199,11 +198,11 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       try {
         await setDoc(doc(db, 'bookings', newId), newBooking);
       } catch (err) {
-        console.error('Gagal sync ke Firestore:', err);
+        console.error('Gagal sync booking ke Firestore:', err);
       }
 
-      // 2. Simpan juga ke localStorage (Fallback)
-      bookings.push(newBooking);
+      // 2. Simpan juga ke localStorage
+      bookings.unshift(newBooking);
       localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
       
       setSubmittedBooking(newBooking);
@@ -233,13 +232,13 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
   return (
     <div className="min-h-screen bg-playbox-bg text-playbox-text-primary font-sans relative overflow-x-hidden">
-      {/* Dynamic Background */}
+      {/* Ambient Background Glow */}
       <div className="ambient-glow"></div>
       
       {/* Header */}
       <header className="relative z-10 p-5 pt-8 text-center pb-6 border-b border-white/5 bg-black/30 backdrop-blur-md">
         
-        {/* Custom Logo / Initial Avatar */}
+        {/* Custom Logo / Avatar */}
         <div className="w-20 h-20 mx-auto rounded-3xl bg-black/40 border border-white/15 flex items-center justify-center shadow-[0_10px_30px_rgba(226,23,142,0.3)] mb-3 overflow-hidden">
           {shopProfile.logo ? (
             <img src={shopProfile.logo} alt="Shop Logo" className="w-full h-full object-cover" />
@@ -256,13 +255,13 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         </p>
 
         {shopProfile.address && (
-          <p className="text-[11px] text-white/60 flex items-center justify-center mb-3.5 px-4">
-            <span className="mr-1">📍</span> {shopProfile.address}
+          <p className="text-[11px] text-white/70 flex items-center justify-center mb-3.5 px-4 font-medium">
+            <span className="mr-1 text-sm">📍</span> {shopProfile.address}
           </p>
         )}
 
-        {/* Action Contact Buttons (WA CS & Instagram) */}
-        <div className="flex items-center justify-center gap-2 flex-wrap">
+        {/* Contact Buttons (WA CS & Instagram) */}
+        <div className="flex items-center justify-center gap-2.5 flex-wrap">
           {shopProfile.phone && (
             <button 
               onClick={() => {
@@ -270,9 +269,9 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                 if (p.startsWith('0')) p = '62' + p.substring(1);
                 window.open(`https://wa.me/${p}?text=${encodeURIComponent(`Halo ${displayShopName}, saya ingin bertanya seputar sewa konsol PlayStation.`)}`, '_blank');
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.15)]"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.15)]"
             >
-              <span>💬</span> WhatsApp CS
+              <span className="text-sm">💬</span> WhatsApp CS
             </button>
           )}
 
@@ -282,9 +281,9 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                 const ig = shopProfile.instagram?.replace(/^@/, '').trim();
                 window.open(`https://instagram.com/${ig}`, '_blank');
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-xs font-bold hover:bg-pink-500/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(226,23,142,0.15)]"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-xs font-bold hover:bg-pink-500/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(226,23,142,0.15)]"
             >
-              <span>📸</span> Instagram
+              <span className="text-sm">📸</span> Instagram
             </button>
           )}
         </div>
@@ -294,7 +293,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       <main className="relative z-10 max-w-lg mx-auto p-4 space-y-5 pb-24">
         <div className="flex justify-between items-end mb-1">
           <h2 className="text-base font-bold text-white tracking-tight">Katalog Unit PlayStation</h2>
-          <span className="text-[11px] text-white/50">{units.filter(u => u.status === 'Ready').length} Unit Tersedia</span>
+          <span className="text-[11px] text-white/60 font-semibold">{units.filter(u => u.status === 'Ready').length} Unit Tersedia</span>
         </div>
 
         <div className="space-y-3.5">
@@ -314,12 +313,12 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                   <h3 className="font-bold text-sm text-white truncate">{unit.name}</h3>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {unit.specs?.slice(0, 2).map((spec: string, idx: number) => (
-                      <span key={`s-${idx}`} className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                      <span key={`s-${idx}`} className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-medium">
                         {spec}
                       </span>
                     ))}
                     {unit.games?.slice(0, 2).map((game: string, idx: number) => (
-                      <span key={`g-${idx}`} className="text-[8px] px-1.5 py-0.5 rounded bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20">
+                      <span key={`g-${idx}`} className="text-[8px] px-1.5 py-0.5 rounded bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20 font-medium">
                         {game}
                       </span>
                     ))}
@@ -328,13 +327,13 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                 
                 <div className="flex justify-between items-end mt-2 pt-1 border-t border-white/5">
                   <div>
-                    <p className="text-[9px] uppercase tracking-wider text-white/40">Tarif / 24 Jam</p>
+                    <p className="text-[9px] uppercase tracking-wider text-white/40 font-semibold">Tarif / 24 Jam</p>
                     <p className="text-xs font-black text-white">Rp {(unit.price || 0).toLocaleString('id-ID')}</p>
                   </div>
                   <button 
                     onClick={() => setSelectedUnit(unit)}
                     disabled={unit.status !== 'Ready'}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                       unit.status === 'Ready' 
                       ? 'bg-playbox-accent text-white hover:bg-opacity-90 active:scale-95 shadow-[0_4px_12px_rgba(226,23,142,0.35)]' 
                       : 'bg-white/5 text-white/30 cursor-not-allowed'
@@ -351,18 +350,18 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
       {/* Booking / Success Modal (Compact Mobile Bottom-Sheet) */}
       {selectedUnit && (
-        <div className={`fixed inset-0 z-50 max-w-md mx-auto flex justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${showSuccess ? 'items-center p-4' : 'items-end sm:items-center p-0 sm:p-4'}`}>
-          <div className={`w-full max-w-md bg-[#0D1122] shadow-2xl border border-white/10 overflow-hidden flex flex-col max-h-[88vh] animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 ${showSuccess ? 'rounded-3xl' : 'rounded-t-3xl sm:rounded-3xl'}`}>
+        <div className={`fixed inset-0 z-50 max-w-md mx-auto flex justify-center bg-black/75 backdrop-blur-sm transition-opacity duration-300 ${showSuccess ? 'items-center p-4' : 'items-end sm:items-center p-0 sm:p-4'}`}>
+          <div className={`w-full max-w-md bg-[#0D1122] shadow-2xl border border-white/10 overflow-hidden flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 ${showSuccess ? 'rounded-3xl' : 'rounded-t-3xl sm:rounded-3xl'}`}>
             
             {/* Modal Header */}
-            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
               <div>
                 <h3 className="font-bold text-base text-white">{showSuccess ? 'Status Pemesanan' : 'Formulir Booking'}</h3>
-                <p className="text-[10px] text-white/50">{selectedUnit.name}</p>
+                <p className="text-xs text-playbox-accent font-semibold">{selectedUnit.name}</p>
               </div>
               <button 
                 onClick={handleCloseModal}
-                className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 transition-colors text-xs"
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 transition-colors text-sm"
               >
                 ✕
               </button>
@@ -377,12 +376,12 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
                 <div>
                   <h2 className="text-lg font-black text-white">Booking Berhasil Diajukan!</h2>
-                  <p className="text-xs text-white/60 mt-1 max-w-xs mx-auto">
-                    Pesanan Anda telah masuk dan sedang menunggu persetujuan admin rental.
+                  <p className="text-xs text-white/70 mt-1 max-w-xs mx-auto">
+                    Pesanan Anda telah masuk ke sistem kami dan sedang menunggu persetujuan admin rental.
                   </p>
                 </div>
 
-                {/* Compact Booking Summary */}
+                {/* Booking Summary */}
                 {submittedBooking && (
                   <div className="bg-black/40 border border-white/10 rounded-2xl p-4 text-left space-y-2 text-xs">
                     <div className="flex justify-between">
@@ -397,9 +396,13 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                       <span className="text-white/50">Jadwal:</span>
                       <span className="font-medium text-white">{submittedBooking.time}</span>
                     </div>
-                    <div className="flex justify-between pt-1 border-t border-white/5">
-                      <span className="text-white/50">Total Biaya:</span>
-                      <span className="font-black text-playbox-accent">Rp {submittedBooking.totalPrice?.toLocaleString('id-ID')}</span>
+                    <div className="flex justify-between">
+                      <span className="text-white/50">Pengiriman:</span>
+                      <span className="font-medium text-white">{submittedBooking.deliveryStatus}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-white/10">
+                      <span className="text-white/70 font-semibold">Total Biaya Unit:</span>
+                      <span className="font-black text-playbox-accent text-sm">Rp {submittedBooking.totalPrice?.toLocaleString('id-ID')}</span>
                     </div>
                   </div>
                 )}
@@ -417,7 +420,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                   
                   {/* Durasi Sewa */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1.5">Durasi Sewa</label>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1.5">Durasi Sewa</label>
                     <div className="grid grid-cols-4 gap-1.5">
                       {[12, 24, 48, 72].map(h => (
                         <button 
@@ -435,12 +438,12 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                   {/* Tanggal & Jam Mulai */}
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Tanggal Sewa</label>
+                      <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Tanggal Mulai</label>
                       <div 
                         onClick={() => { setIsDatePickerOpen(!isDatePickerOpen); setIsTimePickerOpen(false); }}
                         className={`w-full p-3 rounded-xl bg-black/30 border text-xs flex justify-between items-center cursor-pointer transition-all ${isDatePickerOpen ? 'border-playbox-accent text-white' : 'border-white/10 text-white/80'}`}
                       >
-                        <span className="truncate">{startDate ? format(new Date(startDate), 'dd MMM yyyy', { locale: idLocale }) : 'Pilih Tanggal'}</span>
+                        <span className="truncate font-semibold">{startDate ? format(new Date(startDate), 'dd MMM yyyy', { locale: idLocale }) : 'Pilih Tanggal'}</span>
                         <span className="opacity-70 text-xs">📅</span>
                       </div>
                       
@@ -448,7 +451,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                           <div className="p-4 bg-playbox-surface border border-white/10 rounded-2xl shadow-2xl relative max-w-[300px] w-full flex flex-col items-center">
                             <div className="w-full flex justify-between items-center mb-3">
-                              <h3 className="text-white font-bold text-xs">Pilih Tanggal</h3>
+                              <h3 className="text-white font-bold text-xs">Pilih Tanggal Sewa</h3>
                               <button type="button" onClick={() => setIsDatePickerOpen(false)} className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-white/50 text-xs">✕</button>
                             </div>
                             <style>{`
@@ -473,49 +476,64 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Jam Mulai</label>
+                      <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Jam Mulai</label>
                       <div 
                         onClick={() => { 
-                          setTempTime(startTime || '08:00'); 
+                          setCustomTimeInput(startTime || '10:00');
                           setIsTimePickerOpen(true); 
                           setIsDatePickerOpen(false); 
                         }}
                         className={`w-full p-3 rounded-xl bg-black/30 border text-xs flex justify-between items-center cursor-pointer transition-all ${isTimePickerOpen ? 'border-playbox-accent text-white' : 'border-white/10 text-white/80'}`}
                       >
-                        <span>{startTime || 'Pilih Jam'}</span>
+                        <span className="font-semibold">{startTime ? `${startTime} WIB` : 'Pilih Jam'}</span>
                         <span className="opacity-70 text-xs">⏰</span>
                       </div>
                       
                       {isTimePickerOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                          <div className="p-4 bg-playbox-surface border border-white/10 rounded-2xl shadow-2xl relative max-w-[280px] w-full">
-                            <div className="flex justify-between items-center mb-3">
-                              <h3 className="text-white font-bold text-xs">Pilih Jam Mulai</h3>
-                              <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-white/50 text-xs">✕</button>
+                          <div className="p-5 bg-playbox-surface border border-white/15 rounded-3xl shadow-2xl relative max-w-[320px] w-full space-y-4">
+                            <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                              <h3 className="text-white font-bold text-sm">Pilih Jam Mulai Sewa</h3>
+                              <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-xs">✕</button>
                             </div>
 
-                            <div className="grid grid-cols-4 gap-2 mb-4">
-                              {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
-                                <button 
-                                  key={t}
-                                  type="button"
-                                  onClick={() => setTempTime(t)}
-                                  className={`py-2 rounded-lg text-xs font-bold border transition-all ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10'}`}
-                                >
-                                  {t}
-                                </button>
-                              ))}
+                            {/* Manual Time Input */}
+                            <div>
+                              <label className="block text-[10px] font-bold text-playbox-accent uppercase tracking-wider mb-1.5">Input Jam Bebas (Manual)</label>
+                              <input 
+                                type="time"
+                                value={customTimeInput}
+                                onChange={(e) => setCustomTimeInput(e.target.value)}
+                                className="w-full p-3 rounded-xl bg-black/40 border border-playbox-accent text-white text-base font-bold text-center focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Pilihan Cepat Jam Populer */}
+                            <div>
+                              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-1.5">Pilihan Jam Populer</label>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'].map(t => (
+                                  <button 
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setCustomTimeInput(t)}
+                                    className={`py-2 rounded-lg text-xs font-bold border transition-all ${customTimeInput === t ? 'bg-playbox-accent border-playbox-accent text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}
+                                  >
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
 
                             <button 
                               type="button"
                               onClick={() => {
-                                setStartTime(tempTime);
+                                setStartTime(customTimeInput || '10:00');
                                 setIsTimePickerOpen(false);
                               }}
-                              className="w-full py-2.5 bg-playbox-accent text-white font-bold rounded-xl text-xs"
+                              className="w-full py-3 bg-playbox-accent text-white font-bold rounded-xl text-xs shadow-md active:scale-95"
                             >
-                              Simpan Jam
+                              Gunakan Jam Ini ({customTimeInput || '10:00'})
                             </button>
                           </div>
                         </div>
@@ -525,7 +543,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
                   {/* Nama Lengkap */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Nama Lengkap</label>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Nama Lengkap</label>
                     <input 
                       type="text" 
                       value={customerName}
@@ -538,20 +556,20 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
                   {/* No WhatsApp */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">No. WhatsApp</label>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">No. WhatsApp</label>
                     <input 
                       type="tel" 
                       value={customerPhone}
                       onChange={e => setCustomerPhone(e.target.value)}
                       className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent"
-                      placeholder="0812xxxxxxx"
+                      placeholder="Contoh: 081234567890"
                       required
                     />
                   </div>
                   
                   {/* Upload KTP */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Upload KTP (Jaminan)</label>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Upload KTP (Jaminan Wajib)</label>
                     <div className="relative">
                       <input 
                         type="file" 
@@ -561,116 +579,111 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                         required
                       />
                       <div className={`w-full p-3 rounded-xl border flex items-center justify-between transition-colors ${ktpFileName ? 'bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]' : 'bg-black/30 border-white/10 text-white/50'}`}>
-                        <span className="text-xs truncate mr-2">{ktpFileName || 'Pilih Foto KTP...'}</span>
+                        <span className="text-xs truncate mr-2 font-medium">{ktpFileName || 'Pilih Foto KTP / Kartu Identitas...'}</span>
                         <span className="text-sm">{ktpFileName ? '✅' : '📷'}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Metode Pengiriman */}
+                  {/* Metode Pengiriman (JELAS & PROMINENT) */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Metode Pengiriman</label>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1.5">Metode Pengambilan Unit</label>
                     <div className="grid grid-cols-2 gap-2">
-                      <label className={`flex items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all ${!requireDelivery ? 'bg-playbox-accent/20 border-playbox-accent text-white' : 'bg-black/30 border-white/5 text-white/50'}`}>
-                        <input type="radio" name="delivery" checked={!requireDelivery} onChange={() => setRequireDelivery(false)} className="hidden" />
-                        <span className="text-xs font-bold">🏪 Ambil di Toko</span>
-                      </label>
-                      <label className={`flex items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all ${requireDelivery ? 'bg-playbox-accent/20 border-playbox-accent text-white' : 'bg-black/30 border-white/5 text-white/50'}`}>
-                        <input type="radio" name="delivery" checked={requireDelivery} onChange={() => setRequireDelivery(true)} className="hidden" />
-                        <span className="text-xs font-bold">🛵 Diantar (+Ongkir)</span>
-                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setRequireDelivery(false)}
+                        className={`p-3 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${
+                          !requireDelivery 
+                            ? 'bg-playbox-accent/20 border-playbox-accent text-white shadow-md' 
+                            : 'bg-black/30 border-white/10 text-white/50 hover:bg-white/5'
+                        }`}
+                      >
+                        <span className="text-lg mb-1">🏪</span>
+                        <span className="text-xs font-bold">Ambil di Toko</span>
+                        <span className="text-[9px] text-white/50 mt-0.5">Gratis / Ambil Sendiri</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRequireDelivery(true)}
+                        className={`p-3 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${
+                          requireDelivery 
+                            ? 'bg-playbox-accent/20 border-playbox-accent text-white shadow-md' 
+                            : 'bg-black/30 border-white/10 text-white/50 hover:bg-white/5'
+                        }`}
+                      >
+                        <span className="text-lg mb-1">🛵</span>
+                        <span className="text-xs font-bold">Antar - Jemput</span>
+                        <span className="text-[9px] text-playbox-accent font-semibold mt-0.5">+ Ongkir (Dihitung Admin)</span>
+                      </button>
                     </div>
                   </div>
 
                   {/* Alamat Lengkap */}
                   <div>
-                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Alamat Lengkap</label>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">
+                      {requireDelivery ? 'Alamat Lengkap Pengiriman' : 'Alamat Domisili'}
+                    </label>
                     <textarea 
                       value={address}
                       onChange={e => setAddress(e.target.value)}
                       className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent resize-none min-h-[60px]"
-                      placeholder="Detail alamat domisili..."
+                      placeholder={requireDelivery ? "Sebutkan jalan, nomor rumah, patokan..." : "Alamat sesuai domisili tempat tinggal..."}
                       required
                     />
                   </div>
 
                   {/* Pembayaran Toko jika Ambil di Toko */}
                   {!requireDelivery && paymentMethods.length > 0 && (
-                    <div className="pt-3 border-t border-white/5 space-y-3">
-                      <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider">Transfer Pembayaran ke:</label>
-                      <div className="bg-black/40 rounded-xl border border-white/10 p-3 space-y-2">
-                        {paymentMethods.map((pm, idx) => (
-                          <div key={idx} className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-xs">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-white">{pm.name}</span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/60">{pm.type}</span>
+                    <div className="pt-3 border-t border-white/10 space-y-3">
+                      <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider">Transfer Pembayaran ke:</label>
+                      <div className="space-y-2">
+                        {paymentMethods.map(p => (
+                          <div key={p.id} className="p-3 bg-black/40 border border-white/10 rounded-xl flex justify-between items-center text-xs">
+                            <div>
+                              <p className="font-bold text-white">{p.name}</p>
+                              <p className="text-[10px] text-white/50">a.n {p.owner}</p>
                             </div>
-                            <p className="font-mono text-sm font-bold text-playbox-accent mt-0.5">{pm.account}</p>
-                            <p className="text-[10px] text-white/50">a.n. {pm.owner}</p>
+                            <span className="font-mono font-bold text-playbox-accent bg-playbox-accent/10 px-2 py-1 rounded border border-playbox-accent/20">{p.account}</span>
                           </div>
                         ))}
                       </div>
 
-                      {/* Upload Bukti */}
+                      {/* Upload Bukti Transfer */}
                       <div>
-                        <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Upload Bukti Transfer</label>
+                        <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Upload Bukti Transfer (Opsional)</label>
                         <div className="relative">
                           <input 
                             type="file" 
                             accept="image/*"
                             onChange={handlePaymentProofUpload}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            required={!requireDelivery}
                           />
                           <div className={`w-full p-3 rounded-xl border flex items-center justify-between transition-colors ${paymentProofFileName ? 'bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]' : 'bg-black/30 border-white/10 text-white/50'}`}>
-                            <span className="text-xs truncate mr-2">{paymentProofFileName || 'Pilih Bukti Transfer...'}</span>
-                            <span className="text-sm">{paymentProofFileName ? '✅' : '📷'}</span>
+                            <span className="text-xs truncate mr-2 font-medium">{paymentProofFileName || 'Pilih Foto Bukti Transfer...'}</span>
+                            <span className="text-sm">{paymentProofFileName ? '✅' : '📄'}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Summary Footer */}
-                  <div className="pt-3 border-t border-white/5 flex justify-between items-center">
-                    <div>
-                      <p className="text-[9px] text-white/50 uppercase tracking-wider">Tarif Sewa</p>
-                      <p className="text-base font-black text-white">Rp {(selectedUnit.price * (duration / 24)).toLocaleString('id-ID')}</p>
-                    </div>
-                    {requireDelivery && (
-                      <p className="text-[9px] text-playbox-accent font-bold">+ Ongkir Diinfokan Admin</p>
-                    )}
+                  {/* Submit Button */}
+                  <div className="pt-2">
+                    <button 
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(226,23,142,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-xs flex items-center justify-center"
+                    >
+                      {isSubmitting ? 'Memproses Booking...' : `Konfirmasi Booking (${duration === 12 ? '12 Jam' : `${duration/24} Hari`}) →`}
+                    </button>
                   </div>
                 </form>
-              </div>
-            )}
-            
-            {/* Modal Footer Button */}
-            {!showSuccess && (
-              <div className="p-3.5 border-t border-white/5 bg-black/40 backdrop-blur-md">
-                <button 
-                  type="submit"
-                  form="booking-form"
-                  disabled={isSubmitting || !customerName || !customerPhone || !ktpFileName || !address || (!requireDelivery && paymentMethods.length > 0 && !paymentProofFileName)}
-                  className="w-full py-3.5 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_4px_15px_rgba(226,23,142,0.35)] tracking-wide hover:bg-opacity-90 active:scale-95 transition-all text-xs flex items-center justify-center disabled:opacity-50 disabled:active:scale-100"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      Memproses...
-                    </span>
-                  ) : 'Ajukan Booking Sekarang'}
-                </button>
               </div>
             )}
           </div>
         </div>
       )}
-
-      {/* Storefront Footer */}
-      <footer className="text-center pb-8 opacity-40">
-        <p className="text-[10px]">Powered by PlayBox OS</p>
-      </footer>
     </div>
   );
 }

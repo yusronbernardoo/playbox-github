@@ -341,10 +341,10 @@ export default function TimelineBooking() {
             </div>
           </div>
           
-          {bookingData.deliveryAddress && (
+          {(bookingData.deliveryAddress || bookingData.address) && (
             <div className="mt-1">
-              <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Alamat Domisili</p>
-              <p className="text-xs text-white/80 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">{bookingData.deliveryAddress}</p>
+              <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Alamat Domisili / Pengiriman</p>
+              <p className="text-xs text-white/80 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">{bookingData.deliveryAddress || bookingData.address}</p>
             </div>
           )}
           
@@ -352,7 +352,7 @@ export default function TimelineBooking() {
             <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Pengiriman (Ongkir)</p>
             <p className="text-sm font-medium text-white/90">
               {bookingData.requireDelivery 
-                ? `🚗 Antar Jemput (Rp ${bookingData.deliveryFee?.toLocaleString('id-ID') || 0})`
+                ? `🚗 Antar Jemput (Rp ${(bookingData.deliveryFee || 0).toLocaleString('id-ID')})`
                 : '🏬 Ambil di Toko (Tidak ada antar-jemput)'}
             </p>
           </div>
@@ -373,15 +373,27 @@ export default function TimelineBooking() {
               </div>
             ))}
 
-            {!bookingData.documents && bookingData.ktpPhoto && (
-              <div className="w-24 flex-shrink-0 cursor-pointer group" onClick={() => setSelectedImage(bookingData.ktpPhoto)}>
+            {(!bookingData.documents || bookingData.documents.length === 0) && (bookingData.ktpPhoto || bookingData.ktpUrl) && (
+              <div className="w-24 flex-shrink-0 cursor-pointer group" onClick={() => setSelectedImage(bookingData.ktpPhoto || bookingData.ktpUrl)}>
                 <div className="h-16 rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black/50 group-hover:border-playbox-accent transition-colors relative">
-                  <img src={bookingData.ktpPhoto} alt="KTP" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <img src={bookingData.ktpPhoto || bookingData.ktpUrl} alt="KTP" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <span className="text-white text-xs">🔍</span>
                   </div>
                 </div>
-                <p className="text-[9px] text-center mt-2 text-white/70 font-medium">KTP/SIM (Legacy)</p>
+                <p className="text-[9px] text-center mt-2 text-white/70 font-medium">Foto KTP</p>
+              </div>
+            )}
+
+            {bookingData.paymentProof && (
+              <div className="w-24 flex-shrink-0 cursor-pointer group" onClick={() => setSelectedImage(bookingData.paymentProof)}>
+                <div className="h-16 rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black/50 group-hover:border-playbox-accent transition-colors relative">
+                  <img src={bookingData.paymentProof} alt="Bukti Transfer" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-white text-xs">🔍</span>
+                  </div>
+                </div>
+                <p className="text-[9px] text-center mt-2 text-white/70 font-medium">Bukti Bayar</p>
               </div>
             )}
           </div>

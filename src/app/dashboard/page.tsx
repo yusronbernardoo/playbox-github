@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 
 export default function DashboardHome() {
   const [greeting, setGreeting] = useState("Halo");
@@ -32,10 +32,38 @@ export default function DashboardHome() {
     else if (hour < 18) setGreeting("Selamat Sore");
     else setGreeting("Selamat Malam");
 
-    loadDashboardData();
+    // 1. Real-time Shop Profile Listener
+    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.brandName) setBusinessName(d.brandName);
+        if (d.logo) setShopLogo(d.logo);
+      } else {
+        const local = localStorage.getItem('playbox_shop_settings');
+        if (local) {
+          try {
+            const parsed = JSON.parse(local);
+            if (parsed.brandName) setBusinessName(parsed.brandName);
+            if (parsed.logo) setShopLogo(parsed.logo);
+          } catch {}
+        }
+      }
+    });
 
-    // Real-time Firestore sync
-    const unsubscribe = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    // 2. Real-time Units Listener
+    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudUnits: any[] = [];
+        snapshot.forEach((docSnap) => {
+          cloudUnits.push({ ...docSnap.data(), id: docSnap.id });
+        });
+        localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+        loadDashboardData(undefined, cloudUnits);
+      }
+    });
+
+    // 3. Real-time Bookings Listener
+    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudBookings: any[] = [];
         snapshot.forEach((docSnap) => {
@@ -47,54 +75,33 @@ export default function DashboardHome() {
       }
     });
 
-    const handleStorage = (e: StorageEvent) => {
-      if (['playbox_mock_bookings', 'playbox_mock_units', 'playbox_shop_settings'].includes(e.key || '')) {
-        loadDashboardData();
-      }
-    };
-    window.addEventListener('storage', handleStorage);
+    loadDashboardData();
+
     return () => {
-      unsubscribe();
-      window.removeEventListener('storage', handleStorage);
+      unsubscribeShop();
+      unsubscribeUnits();
+      unsubscribeBookings();
     };
   }, []);
 
-  const loadDashboardData = async (customBookings?: any[]) => {
-    // Dynamic SaaS Loading: Shop Settings & Logo
-    const shopSettings = localStorage.getItem('playbox_shop_settings');
-    if (shopSettings) {
-      const parsed = JSON.parse(shopSettings);
-      setBusinessName(parsed.brandName || 'PlayBox Rental');
-      setShopLogo(parsed.logo || '');
-    } else {
-      try {
-        const snap = await getDoc(doc(db, 'settings', 'shop'));
-        if (snap.exists()) {
-          const d = snap.data();
-          setBusinessName(d.brandName || 'PlayBox Rental');
-          setShopLogo(d.logo || '');
-        }
-      } catch (e) {
-        console.warn('Dashboard logo load fallback:', e);
-      }
-    }
-
-    const savedUnits = localStorage.getItem('playbox_mock_units');
+  const loadDashboardData = (customBookings?: any[], customUnits?: any[]) => {
+    // 1. Calculate Unit Stats
+    const savedUnits = customUnits || (localStorage.getItem('playbox_mock_units') ? JSON.parse(localStorage.getItem('playbox_mock_units')!) : []);
     let totalU = 0, readyU = 0, disewaU = 0, maintenanceU = 0;
-    if (savedUnits) {
-      const units = JSON.parse(savedUnits);
-      totalU = units.length;
-      readyU = units.filter((u: any) => u.status === 'Ready').length;
-      disewaU = units.filter((u: any) => u.status === 'Disewa').length;
-      maintenanceU = units.filter((u: any) => u.status === 'Maintenance').length;
+    if (savedUnits && savedUnits.length > 0) {
+      totalU = savedUnits.length;
+      readyU = savedUnits.filter((u: any) => u.status === 'Ready').length;
+      disewaU = savedUnits.filter((u: any) => u.status === 'Disewa').length;
+      maintenanceU = savedUnits.filter((u: any) => u.status === 'Maintenance').length;
     }
 
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
+    // 2. Calculate Booking & Financial Stats
+    const savedBookings = customBookings || (localStorage.getItem('playbox_mock_bookings') ? JSON.parse(localStorage.getItem('playbox_mock_bookings')!) : []);
     let baruB = 0;
     let pendingTasks: any[] = [];
     let totalRevenue = 0;
 
-    const bookings = customBookings || (savedBookings ? JSON.parse(savedBookings) : []);
+    const bookings = savedBookings || [];
     if (bookings && bookings.length > 0) {
       baruB = bookings.filter((b: any) => b.status === 'Perlu Verifikasi').length;
       
@@ -112,18 +119,16 @@ export default function DashboardHome() {
         if (b.status === 'Sedang Dipakai' || b.status === 'Diantar') {
           try {
             let startDate: Date | null = null;
-            let durationHours = b.duration || 24;
+            let durationHours = Number(b.durationHours || b.duration || 24);
 
-            if (b.isoStart) {
-              startDate = new Date(b.isoStart);
+            if (b.isoStart || b.startTime) {
+              startDate = new Date(b.isoStart || b.startTime);
             } else if (b.time) {
               const parts = b.time.split(', ');
               if (parts.length === 2) {
                 const dateStr = parts[0]; 
                 const timeParts = parts[1].split(' ');
                 const timeStr = timeParts[0]; 
-                const durationStr = timeParts[1] || '24';
-                durationHours = parseInt(durationStr.replace(/\D/g, '')) || 24;
                 startDate = new Date(`${dateStr}T${timeStr}:00`);
               }
             }
@@ -179,8 +184,8 @@ export default function DashboardHome() {
       bookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           let bDate = new Date();
-          if (b.isoStart) {
-            bDate = new Date(b.isoStart);
+          if (b.isoStart || b.startTime) {
+            bDate = new Date(b.isoStart || b.startTime);
           } else if (b.createdAt) {
             bDate = new Date(b.createdAt);
           }
@@ -224,11 +229,7 @@ export default function DashboardHome() {
     });
     setTasks(pendingTasks);
     setRevenue(totalRevenue);
-    
-    if (savedBookings) {
-      const bookings = JSON.parse(savedBookings);
-      setRecentBookings([...bookings].reverse().slice(0, 3));
-    }
+    setRecentBookings([...bookings].slice(0, 3));
   };
 
   // Calculate percentage change compared to yesterday
@@ -261,7 +262,7 @@ export default function DashboardHome() {
             </div>
           ) : (
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-lg font-black text-white shrink-0 shadow-md uppercase">
-              {businessName.charAt(0)}
+              {businessName ? businessName.charAt(0) : 'P'}
             </div>
           )}
           <div>
@@ -278,7 +279,7 @@ export default function DashboardHome() {
         <Link href="/dashboard/booking" className="p-2.5 glass-surface rounded-full relative transition-transform hover:scale-105 active:scale-95 block border border-white/10">
           <span className="text-lg">🔔</span>
           {stats.bookingBaru > 0 && (
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-playbox-accent rounded-full border border-playbox-surface shadow-[0_0_8px_rgba(226,23,142,0.8)]"></span>
+            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full border border-playbox-surface shadow-[0_0_8px_rgba(234,179,8,0.8)] animate-ping"></span>
           )}
         </Link>
       </header>
@@ -378,7 +379,7 @@ export default function DashboardHome() {
                   {task.isOverdue && <span className="mr-1.5 text-sm animate-bounce">🚨</span>}
                   {!task.isOverdue && task.isWarning && <span className="mr-1.5 text-sm animate-pulse">⚠️</span>}
                   <span className={task.isOverdue ? 'text-red-400 font-extrabold' : 'text-white'}>
-                    {task.isWarning ? task.warningMsg : task.status === 'Perlu Verifikasi' ? `Verifikasi Pembayaran` : `${task.status} - ${task.unit}`}
+                    {task.isWarning ? task.warningMsg : task.status === 'Perlu Verifikasi' ? `Verifikasi Booking Baru` : `${task.status} - ${task.unit}`}
                   </span>
                 </p>
                 <p className="text-[11px] text-playbox-text-secondary mt-0.5 truncate">
@@ -387,14 +388,14 @@ export default function DashboardHome() {
               </div>
 
               <Link 
-                href={task.status === 'Perlu Verifikasi' ? '/dashboard/booking' : `/dashboard/booking/${task.id}/timeline`} 
+                href={task.status === 'Perlu Verifikasi' ? `/dashboard/booking/${task.id}/verify` : `/dashboard/booking/${task.id}/timeline`} 
                 className={`${
                   task.isOverdue ? 'bg-red-500 text-white shadow-[0_4px_15px_rgba(239,68,68,0.4)] hover:bg-red-600' : 
                   task.isWarning ? 'bg-amber-500 text-white hover:bg-amber-600' : 
-                  task.status === 'Perlu Verifikasi' ? 'saas-button-secondary' : 'saas-button'
+                  task.status === 'Perlu Verifikasi' ? 'bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold shadow-[0_4px_15px_rgba(234,179,8,0.4)]' : 'saas-button'
                 } text-xs px-3.5 py-2 rounded-xl whitespace-nowrap font-bold transition-all active:scale-95`}
               >
-                {task.isOverdue ? 'Tarik & Denda' : task.isWarning ? 'Cek Unit' : task.status === 'Perlu Verifikasi' ? 'Cek' : 'Update'}
+                {task.isOverdue ? 'Tarik & Denda' : task.isWarning ? 'Cek Unit' : task.status === 'Perlu Verifikasi' ? 'Verifikasi' : 'Update'}
               </Link>
             </div>
           )) : (
