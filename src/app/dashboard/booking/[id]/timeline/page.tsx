@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 
 export default function TimelineBooking() {
   const { id } = useParams();
@@ -17,18 +17,46 @@ export default function TimelineBooking() {
   const [currentStage, setCurrentStage] = useState(1);
   const [completedTimes, setCompletedTimes] = useState<Record<number, string>>({});
   const [photoKondisi, setPhotoKondisi] = useState<string | null>(null);
+  
+  // Dynamic Shop Branding & Payment Methods
   const [businessName, setBusinessName] = useState("PLAYBOX");
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const shopSettings = localStorage.getItem('playbox_shop_settings');
-      if (shopSettings) {
-        setBusinessName(JSON.parse(shopSettings).brandName || "PLAYBOX");
+    // Load Shop Settings & Payment Methods
+    const loadShopAndPayments = async () => {
+      try {
+        // Shop Profile
+        const shopSnap = await getDoc(doc(db, 'settings', 'shop'));
+        if (shopSnap.exists()) {
+          const s = shopSnap.data();
+          if (s.brandName) setBusinessName(s.brandName);
+          if (s.logo) setBusinessLogo(s.logo);
+        } else {
+          const shopSettings = localStorage.getItem('playbox_shop_settings');
+          if (shopSettings) {
+            const parsed = JSON.parse(shopSettings);
+            if (parsed.brandName) setBusinessName(parsed.brandName);
+            if (parsed.logo) setBusinessLogo(parsed.logo);
+          }
+        }
+
+        // Payments
+        const savedPayments = localStorage.getItem('playbox_payments');
+        if (savedPayments) {
+          const parsed = JSON.parse(savedPayments);
+          setPaymentMethods(parsed.filter((p: any) => p.active && p.type !== 'QRIS'));
+        }
+      } catch (err) {
+        console.warn('Error loading store config:', err);
       }
-    }
+    };
+
+    loadShopAndPayments();
 
     if (!id || typeof id !== 'string') return;
 
@@ -120,11 +148,9 @@ export default function TimelineBooking() {
     return () => clearInterval(interval);
   }, [bookingData?.endTime, bookingData?.isoEnd]);
 
-
   const handleUpdateStatus = async () => {
     if (!bookingData) return;
 
-    // Current stage corresponds to `stages[currentStage - 1]`
     const currentStatusName = stages[currentStage - 1];
 
     if (currentStatusName === 'Foto Kondisi Awal' && !photoKondisi) {
@@ -138,7 +164,7 @@ export default function TimelineBooking() {
     } 
     
     if (currentStage < stages.length) {
-      const nextStatusName = stages[currentStage]; // Next step
+      const nextStatusName = stages[currentStage];
       
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -150,7 +176,6 @@ export default function TimelineBooking() {
       else if (nextStatusName.includes('Dijemput') || nextStatusName.includes('Dikembalikan')) color = 'bg-purple-500/15 text-purple-400';
       else if (nextStatusName === 'Selesai') color = 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20';
       
-      // Clean up status name for DB
       let cleanStatus = nextStatusName.replace(' (Ambil di Toko)', '').replace(' (Toko)', '');
 
       // 1. Update Firestore
@@ -206,11 +231,33 @@ export default function TimelineBooking() {
       link.click();
 
       const phone = bookingData.customerPhone.startsWith('0') ? '62' + bookingData.customerPhone.slice(1) : bookingData.customerPhone;
-      const text = `Halo Kak ${bookingData.customer}! 👋\nIni lampiran invoice/nota untuk pesanan Anda (*${bookingData.code}*) yang telah selesai.\n\nTerima kasih telah menyewa di PlayBox! 🎮✨`;
+      
+      // Calculate Fine amounts
+      const lateFine = Number(bookingData.fines?.totalLateFine || 0);
+      const damageFine = Number(bookingData.fines?.totalDamageFine || 0);
+      const internalFine = Number(bookingData.fines?.totalInternalFine || 0);
+      const totalFine = lateFine + damageFine + internalFine;
+
+      let text = '';
+      if (totalFine > 0) {
+        // Message WITH Fines (No emoji, dynamic store name, fine details, and bank account list)
+        let fineDetails = [];
+        if (lateFine > 0) fineDetails.push(`- Denda Keterlambatan (${bookingData.fines.lateHours} Jam): Rp ${lateFine.toLocaleString('id-ID')}`);
+        if (damageFine > 0) fineDetails.push(`- Denda Kerusakan/Kehilangan: Rp ${damageFine.toLocaleString('id-ID')}`);
+        if (internalFine > 0) fineDetails.push(`- Denda Khusus: Rp ${internalFine.toLocaleString('id-ID')}`);
+
+        let bankInfo = paymentMethods.length > 0
+          ? paymentMethods.map(p => `* ${p.name}: ${p.account} (a.n ${p.owner})`).join('\n')
+          : '* Transfer Bank / Kasir';
+
+        text = `Halo Kak ${bookingData.customer}!\n\nIni lampiran invoice/nota untuk pesanan Anda (*${bookingData.code}*) yang telah selesai.\n\nInformasi Denda:\n${fineDetails.join('\n')}\n*Total Denda: Rp ${totalFine.toLocaleString('id-ID')}*\n\nSilakan transfer pembayaran denda ke rekening berikut:\n${bankInfo}\n\nTerima kasih telah menyewa di ${businessName}!`;
+      } else {
+        // Standard Invoice Message (No emoji, dynamic store name)
+        text = `Halo Kak ${bookingData.customer}!\n\nIni lampiran invoice/nota untuk pesanan Anda (*${bookingData.code}*) yang telah selesai.\n\nTerima kasih telah menyewa di ${businessName}!`;
+      }
       
       setTimeout(() => {
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
-        // Redirect back to dashboard after finishing
         setTimeout(() => {
           router.push('/dashboard');
         }, 1000);
@@ -350,7 +397,6 @@ export default function TimelineBooking() {
             const isActive = stepNumber === currentStage;
             const isFuture = stepNumber > currentStage;
 
-            // Highlight color handling
             let dotColor = 'bg-white/20 border-white/5';
             let textColor = 'text-white/40';
             
@@ -365,14 +411,10 @@ export default function TimelineBooking() {
 
             return (
               <div key={idx} className="relative group">
-                {/* Timeline Dot */}
-                <div className={`absolute -left-[33px] w-4 h-4 rounded-full transition-all duration-300 flex items-center justify-center
-                  ${dotColor} border-4
-                `}>
+                <div className={`absolute -left-[33px] w-4 h-4 rounded-full transition-all duration-300 flex items-center justify-center ${dotColor} border-4`}>
                   {isActive && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>}
                 </div>
 
-                {/* Content */}
                 <div className={`transition-all duration-300 ${isActive ? 'translate-x-1' : ''}`}>
                   <h3 className={`text-base font-bold ${textColor}`}>
                     {stage}
@@ -420,7 +462,7 @@ export default function TimelineBooking() {
         </div>
       </div>
 
-      {/* Action Bar (Not floating anymore to prevent 'ngambang' issue) */}
+      {/* Action Bar */}
       <div className="mt-8 pt-4 border-t border-white/5">
         {currentStage < stages.length ? (
           <div className="flex gap-3">
@@ -470,19 +512,24 @@ export default function TimelineBooking() {
         </div>
       )}
 
-      {/* Hidden Invoice Template for Capture */}
+      {/* Hidden Invoice Template for Capture with Dynamic Store Logo and Name */}
       <div className="fixed top-[-9999px] left-[-9999px] z-[-1]">
         <div ref={invoiceRef} className="w-[800px] p-10 bg-[#0E1221] text-white flex flex-col relative overflow-hidden font-sans border-t-[10px] border-playbox-accent shadow-2xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-playbox-accent/10 rounded-full blur-3xl"></div>
           
           <div className="flex justify-between items-start mb-10 border-b border-white/10 pb-8 relative z-10">
-            <div>
-              <h1 className="text-4xl font-black tracking-tighter text-playbox-accent uppercase">{businessName}</h1>
-              <p className="text-[#9BA1B0] text-lg mt-1 font-medium">Rental PlayStation Premium</p>
+            <div className="flex items-center space-x-4">
+              {businessLogo && (
+                <img src={businessLogo} alt="Logo" className="w-16 h-16 rounded-2xl object-cover border border-white/10 shadow-lg" />
+              )}
+              <div>
+                <h1 className="text-3xl font-black tracking-tighter text-playbox-accent uppercase">{businessName}</h1>
+                <p className="text-[#9BA1B0] text-sm mt-1 font-medium">Rental PlayStation Premium</p>
+              </div>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold tracking-tight text-white/90">INVOICE</p>
-              <p className="text-playbox-accent font-bold mt-2 text-xl">{bookingData?.code}</p>
+              <p className="text-playbox-accent font-bold mt-1 text-xl">{bookingData?.code}</p>
             </div>
           </div>
 
@@ -494,8 +541,10 @@ export default function TimelineBooking() {
             </div>
             <div className="text-right">
               <p className="text-[#9BA1B0] text-sm font-semibold uppercase tracking-wider mb-2">Periode Sewa</p>
-              <p className="text-lg font-bold text-white">{bookingData?.startDate}</p>
-              <p className="text-white/60 text-lg mt-1">{bookingData?.durationHours} Jam</p>
+              <p className="text-lg font-bold text-white">
+                {bookingData?.startTime ? new Date(bookingData.startTime).toLocaleDateString('id-ID') : bookingData?.startDate}
+              </p>
+              <p className="text-white/60 text-lg mt-1">{bookingData?.durationHours || 24} Jam</p>
             </div>
           </div>
 
@@ -556,7 +605,7 @@ export default function TimelineBooking() {
           </div>
 
           <div className="mt-16 text-center text-white/40 font-medium text-sm relative z-10">
-            <p>Terima kasih telah menggunakan layanan PlayBox.</p>
+            <p>Terima kasih telah menggunakan layanan {businessName}.</p>
             <p className="mt-1">Invoice ini dicetak secara otomatis dan sah sebagai bukti transaksi.</p>
           </div>
         </div>

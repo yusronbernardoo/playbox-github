@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
 
 export default function Keuangan() {
   const router = useRouter();
@@ -14,12 +16,16 @@ export default function Keuangan() {
   const [isExpenseCategoryOpen, setIsExpenseCategoryOpen] = useState(false);
   const [newExpense, setNewExpense] = useState({ category: 'Bensin', amount: '', desc: '' });
 
+  // 2-Step Delete Verification State
+  const [expenseToDelete, setExpenseToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleAmountChange = (val: string) => {
     const numeric = val.replace(/\D/g, '');
     setNewExpense({...newExpense, amount: numeric});
   };
 
-  const categories = ['Bensin', 'Servis', 'Update Game', 'Lainnya'];
+  const categories = ['Bensin', 'Servis', 'Update Game', 'Konsumsi & Snack', 'Gaji Karyawan', 'Lainnya'];
 
   const [data, setData] = useState<{
     pendapatan: number;
@@ -52,47 +58,66 @@ export default function Keuangan() {
     }
     setIsAuth(true);
 
+    loadFinancialData();
+
+    // Setup Real-Time Listeners for Bookings and Expenses
+    const unsubscribeExpenses = onSnapshot(collection(db, 'expenses'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudExpenses: any[] = [];
+        snapshot.forEach((d) => {
+          cloudExpenses.push({ id: d.id, ...d.data() });
+        });
+        cloudExpenses.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        localStorage.setItem('playbox_expenses', JSON.stringify(cloudExpenses));
+        setData(prev => ({ ...prev, pengeluaranItems: cloudExpenses }));
+      }
+    }, (err) => console.warn('Expenses listener fallback:', err));
+
+    return () => {
+      unsubscribeExpenses();
+    };
+  }, [router, period, selectedDate]);
+
+  const loadFinancialData = async () => {
     const savedBookings = localStorage.getItem('playbox_mock_bookings');
+    let totalPendapatan = 0;
+    let totalRental = 0;
+    let totalDelivery = 0;
+    let totalDenda = 0;
+
+    const filterBooking = (b: any) => {
+      if (!b.isoStart && !b.createdAt) return true;
+      const bDate = new Date(b.isoStart || b.createdAt);
+      const now = new Date();
+      
+      if (period === 'Hari Ini') {
+        return bDate.getDate() === now.getDate() && bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear();
+      }
+      if (period === 'Minggu Ini') {
+        const day = now.getDay();
+        const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
+        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
+        startOfWeek.setHours(0, 0, 0, 0);
+        
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+
+        return bDate.getTime() >= startOfWeek.getTime() && bDate.getTime() <= endOfWeek.getTime();
+      }
+      if (period === 'Bulan Ini') {
+        return bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear();
+      }
+      if (selectedDate) {
+        return bDate.getDate() === selectedDate.getDate() && bDate.getMonth() === selectedDate.getMonth() && bDate.getFullYear() === selectedDate.getFullYear();
+      }
+      return true;
+    };
+
     if (savedBookings) {
       const bookings = JSON.parse(savedBookings);
-      let totalPendapatan = 0;
-      let totalRental = 0;
-      let totalDelivery = 0;
-      let totalDenda = 0;
-      
-      const filterBooking = (b: any) => {
-        if (!b.isoStart) return true; // fallback
-        const bDate = new Date(b.isoStart);
-        const now = new Date();
-        
-        if (period === 'Hari Ini') {
-          return bDate.getDate() === now.getDate() && bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear();
-        }
-        if (period === 'Minggu Ini') {
-          // Hitung dari hari Senin sampai Minggu di minggu yang sama
-          const day = now.getDay();
-          const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
-          const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
-          startOfWeek.setHours(0, 0, 0, 0);
-          
-          const endOfWeek = new Date(startOfWeek);
-          endOfWeek.setDate(startOfWeek.getDate() + 6);
-          endOfWeek.setHours(23, 59, 59, 999);
-
-          return bDate.getTime() >= startOfWeek.getTime() && bDate.getTime() <= endOfWeek.getTime();
-        }
-        if (period === 'Bulan Ini') {
-          return bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear();
-        }
-        if (selectedDate) {
-          return bDate.getDate() === selectedDate.getDate() && bDate.getMonth() === selectedDate.getMonth() && bDate.getFullYear() === selectedDate.getFullYear();
-        }
-        return true;
-      };
-
       bookings.forEach((b: any) => {
         if ((b.status === 'Selesai' || b.paymentStatus === 'Lunas') && filterBooking(b)) {
-          // Calculate fines properly from the Return page structure
           const tDenda = b.fines ? (
             Number(b.fines.totalLateFine || 0) + 
             Number(b.fines.totalDamageFine || 0) + 
@@ -104,43 +129,102 @@ export default function Keuangan() {
           
           totalPendapatan += tPrice; 
           totalDelivery += tDelivery;
-          
-          // Rental is total minus delivery and minus denda
           totalRental += (tPrice - tDelivery - tDenda);
           totalDenda += tDenda;
         }
       });
-
-      setData(prev => ({
-        ...prev,
-        pendapatan: totalPendapatan,
-        rental: totalRental,
-        delivery: totalDelivery,
-        denda: totalDenda,
-        pendapatanTren: totalPendapatan > 0 ? 12.5 : 0
-      }));
     }
-  }, [router, period, selectedDate]);
+
+    // Load Expenses
+    let savedExpenses: any[] = [];
+    const localExp = localStorage.getItem('playbox_expenses');
+    if (localExp) {
+      savedExpenses = JSON.parse(localExp);
+    } else {
+      try {
+        const expSnap = await getDocs(collection(db, 'expenses'));
+        if (!expSnap.empty) {
+          expSnap.forEach(d => savedExpenses.push({ id: d.id, ...d.data() }));
+          localStorage.setItem('playbox_expenses', JSON.stringify(savedExpenses));
+        }
+      } catch (e) {
+        console.warn('Load expenses fallback:', e);
+      }
+    }
+
+    setData({
+      pendapatan: totalPendapatan,
+      rental: totalRental,
+      delivery: totalDelivery,
+      denda: totalDenda,
+      pendapatanTren: totalPendapatan > 0 ? 12.5 : 0,
+      pengeluaranItems: savedExpenses
+    });
+  };
 
   if (!isAuth) return <div className="min-h-screen bg-playbox-bg"></div>;
 
-  const pengeluaranTotal = data.pengeluaranItems.reduce((acc, curr) => acc + curr.amount, 0);
+  const pengeluaranTotal = data.pengeluaranItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   const profit = data.pendapatan - pengeluaranTotal;
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newId = `EXP-${Date.now()}`;
     const item = {
-      id: Date.now(),
+      id: newId,
       category: newExpense.category,
       amount: parseInt(newExpense.amount),
-      desc: newExpense.desc
+      desc: newExpense.desc,
+      createdAt: new Date().toISOString()
     };
+
+    // 1. Sync to Firestore
+    try {
+      await setDoc(doc(db, 'expenses', newId), item);
+    } catch (err) {
+      console.error('Failed adding expense to Firestore:', err);
+    }
+
+    // 2. Local State
+    const updated = [item, ...data.pengeluaranItems];
     setData({
       ...data,
-      pengeluaranItems: [...data.pengeluaranItems, item]
+      pengeluaranItems: updated
     });
+    localStorage.setItem('playbox_expenses', JSON.stringify(updated));
+
     setNewExpense({ category: 'Bensin', amount: '', desc: '' });
     setShowModal(false);
+  };
+
+  // 2-Step Delete Execution
+  const handleConfirmDelete = async () => {
+    if (!expenseToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      // 1. Delete from Firestore
+      try {
+        await deleteDoc(doc(db, 'expenses', expenseToDelete.id));
+      } catch (err) {
+        console.error('Failed deleting expense from Firestore:', err);
+      }
+
+      // 2. Delete from LocalStorage & State
+      const updated = data.pengeluaranItems.filter(item => item.id !== expenseToDelete.id);
+      setData({
+        ...data,
+        pengeluaranItems: updated
+      });
+      localStorage.setItem('playbox_expenses', JSON.stringify(updated));
+
+      setIsDeleting(false);
+      setExpenseToDelete(null);
+    } catch (error) {
+      console.error('Delete expense error:', error);
+      setIsDeleting(false);
+      setExpenseToDelete(null);
+    }
   };
 
   // Calendar Helpers
@@ -153,28 +237,30 @@ export default function Keuangan() {
   
   const daysInMonth = getDaysInMonth(currentMonth);
   const firstDay = getFirstDayOfMonth(currentMonth);
-  // Adjust starting day to Monday=0 instead of Sunday=0 for Indonesian standard (optional, but let's stick to Sunday=0 for simplicity)
-  // Let's use standard Sunday=0: Min, Sen, Sel, Rab, Kam, Jum, Sab
   const weekDays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
   const blanks = Array.from({ length: firstDay }, (_, i) => i);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
-    <div className="p-4 space-y-8 pb-24 relative">
+    <div className="p-4 space-y-7 pb-24 relative min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mt-2 relative z-20">
-        <h1 className="text-2xl font-bold tracking-tight">Keuangan</h1>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Keuangan Rental</h1>
+          <p className="text-xs text-playbox-text-secondary mt-0.5">Laporan Arus Kas & Laba Bersih</p>
+        </div>
+
         <div className="relative">
           <div 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center space-x-2 bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2 cursor-pointer font-medium hover:bg-white/10 transition-colors shadow-sm backdrop-blur-md"
+            className="flex items-center space-x-2 bg-white/5 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2 cursor-pointer font-medium hover:bg-white/10 transition-colors shadow-sm backdrop-blur-md"
           >
             <span>{period}</span>
             <span className={`text-[10px] transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
           </div>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-[#10152B]/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-2">
+            <div className="absolute right-0 top-full mt-2 w-44 bg-[#10152B]/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-2 z-30">
               {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Pilih Tanggal...'].map((opt) => (
                 <div 
                   key={opt}
@@ -183,12 +269,12 @@ export default function Keuangan() {
                     setIsDropdownOpen(false);
                     if (opt === 'Pilih Tanggal...') setShowDatePicker(true);
                   }}
-                  className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                  className={`px-3.5 py-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between ${
                     period === opt ? 'bg-playbox-accent/10 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'
                   }`}
                 >
                   {opt}
-                  {period === opt && <span className="text-playbox-accent">✓</span>}
+                  {period === opt && <span className="text-playbox-accent font-bold">✓</span>}
                 </div>
               ))}
             </div>
@@ -197,65 +283,72 @@ export default function Keuangan() {
       </div>
 
       {/* Kartu Pendapatan */}
-      <div className="glass-surface p-6 rounded-3xl relative overflow-hidden group">
+      <div className="glass-surface p-6 rounded-3xl relative overflow-hidden group border border-white/5">
         <div className="absolute top-0 right-0 w-48 h-48 bg-playbox-ready/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-playbox-ready/20 transition-all duration-700"></div>
-        <h2 className="text-xs font-semibold text-playbox-text-secondary mb-2 uppercase tracking-wider">Total Pendapatan</h2>
+        <h2 className="text-xs font-bold text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Total Pendapatan</h2>
+        
         <div className="flex flex-col">
-          <p className="text-4xl font-bold text-white tracking-tighter">Rp {data.pendapatan.toLocaleString('id-ID')}</p>
-          <div className="flex items-center mt-3 space-x-2">
-            <span className="bg-playbox-ready/10 text-playbox-ready text-xs px-2 py-1 rounded font-medium tracking-wide">
+          <p className="text-3xl font-black text-white tracking-tight">Rp {data.pendapatan.toLocaleString('id-ID')}</p>
+          <div className="flex items-center mt-2 space-x-2">
+            <span className="bg-[#25D366]/20 text-[#25D366] text-xs px-2 py-0.5 rounded font-bold tracking-wide border border-[#25D366]/30">
               ▲ {data.pendapatanTren}%
             </span>
-            <span className="text-xs text-playbox-text-secondary">vs periode lalu</span>
+            <span className="text-[11px] text-playbox-text-secondary">vs periode lalu</span>
           </div>
         </div>
         
-        <div className="mt-8 pt-5 border-t border-white/5">
+        <div className="mt-6 pt-5 border-t border-white/5">
           {/* Progress Bar Proporsi */}
           {data.pendapatan > 0 && (
-            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex mb-5 shadow-inner">
+            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex mb-4 shadow-inner">
               <div style={{ width: `${(data.rental / data.pendapatan) * 100}%` }} className="bg-blue-500 h-full"></div>
               <div style={{ width: `${(data.delivery / data.pendapatan) * 100}%` }} className="bg-purple-500 h-full"></div>
               <div style={{ width: `${(data.denda / data.pendapatan) * 100}%` }} className="bg-red-500 h-full"></div>
             </div>
           )}
 
-          <div className="space-y-4">
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-playbox-text-secondary flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span> Sewa Unit</span>
-            <span className="font-medium text-white">Rp {data.rental.toLocaleString('id-ID')}</span>
-          </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-playbox-text-secondary flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2"></span> Biaya Delivery</span>
-            <span className="font-medium text-white">Rp {data.delivery.toLocaleString('id-ID')}</span>
-          </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-playbox-text-secondary flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span> Denda (Fines)</span>
-            <span className="font-medium text-white">Rp {data.denda.toLocaleString('id-ID')}</span>
-          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-playbox-text-secondary flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span> Sewa Unit</span>
+              <span className="font-bold text-white">Rp {data.rental.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-playbox-text-secondary flex items-center"><span className="w-2 h-2 rounded-full bg-purple-500 mr-2"></span> Biaya Delivery</span>
+              <span className="font-bold text-white">Rp {data.delivery.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-playbox-text-secondary flex items-center"><span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Denda (Fines)</span>
+              <span className="font-bold text-white">Rp {data.denda.toLocaleString('id-ID')}</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Net Profit */}
-      <div className="glass-surface-elevated p-5 rounded-2xl border-l-4 border-l-playbox-ready flex justify-between items-center shadow-[0_8px_30px_rgba(35,197,82,0.15)]">
+      <div className="glass-surface-elevated p-5 rounded-3xl border-l-4 border-l-[#25D366] flex justify-between items-center shadow-[0_8px_30px_rgba(35,197,82,0.15)] border border-white/5">
         <div>
-          <h2 className="text-sm font-semibold text-white/80 tracking-wide">Net Profit</h2>
-          <p className="text-[9px] text-white/40 font-medium mt-0.5">(Pendapatan - Pengeluaran)</p>
+          <h2 className="text-xs font-bold text-white/80 tracking-wider uppercase">Net Profit (Laba Bersih)</h2>
+          <p className="text-[10px] text-white/40 font-medium mt-0.5">(Pendapatan - Pengeluaran)</p>
         </div>
-        <span className="text-2xl font-bold text-playbox-ready tracking-tight">Rp {profit.toLocaleString('id-ID')}</span>
+        <span className="text-2xl font-black text-[#25D366] tracking-tight">Rp {profit.toLocaleString('id-ID')}</span>
       </div>
 
-      {/* Pengeluaran */}
-      <div className="glass-surface p-6 rounded-3xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-sm font-semibold text-white/80 tracking-wide">Pengeluaran</h2>
-          <button onClick={() => setShowModal(true)} className="text-xs font-bold text-white bg-playbox-accent hover:bg-playbox-accent/80 px-4 py-2 rounded-xl transition-all duration-300 active:scale-95 shadow-[0_4px_15px_rgba(226,23,142,0.4)]">
+      {/* Pengeluaran Section with Trash Icon and 2-Step Verification */}
+      <div className="glass-surface p-6 rounded-3xl border border-white/5">
+        <div className="flex justify-between items-center mb-5">
+          <div>
+            <h2 className="text-xs font-bold text-white/80 tracking-wider uppercase">Pengeluaran Operasional</h2>
+            <p className="text-[10px] text-white/40 mt-0.5">{data.pengeluaranItems.length} Catatan</p>
+          </div>
+          <button 
+            onClick={() => setShowModal(true)} 
+            className="text-xs font-bold text-white bg-playbox-accent hover:bg-playbox-accent/80 px-3.5 py-2 rounded-xl transition-all duration-200 active:scale-95 shadow-[0_4px_15px_rgba(226,23,142,0.35)]"
+          >
             + Tambah
           </button>
         </div>
         
-        <div className="space-y-1">
+        <div className="space-y-2">
           {data.pengeluaranItems.length === 0 ? (
             <div className="py-8 text-center text-white/40">
               <span className="text-3xl block mb-2 opacity-30">💸</span>
@@ -263,43 +356,113 @@ export default function Keuangan() {
             </div>
           ) : (
             data.pengeluaranItems.map((item, idx) => (
-            <div key={item.id} className="flex justify-between items-center py-3 group hover:bg-white/5 rounded-xl px-2 transition-colors -mx-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 text-xs font-bold">
-                  {idx + 1}
+              <div 
+                key={item.id || idx} 
+                className="flex justify-between items-center p-3 group hover:bg-white/5 rounded-2xl transition-all bg-black/20 border border-white/5"
+              >
+                <div className="flex items-center space-x-3 min-w-0 pr-2">
+                  <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60 text-xs font-bold shrink-0">
+                    {idx + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs text-white truncate">{item.category}</p>
+                    <p className="text-[10px] text-playbox-text-secondary truncate mt-0.5">{item.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-sm text-white/90">{item.category}</p>
-                  <p className="text-xs text-playbox-text-secondary mt-0.5">{item.desc}</p>
+
+                <div className="flex items-center space-x-3 shrink-0">
+                  <span className="font-black text-red-400 text-xs tracking-tight">
+                    -Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}
+                  </span>
+
+                  {/* 🗑️ Trash Delete Icon (Opens 2-Step Verification) */}
+                  <button 
+                    type="button"
+                    onClick={() => setExpenseToDelete(item)}
+                    title="Hapus Pengeluaran"
+                    className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/20 flex items-center justify-center text-xs transition-colors active:scale-95"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
-              <span className="font-bold text-red-400 text-sm tracking-tight">-Rp {item.amount.toLocaleString('id-ID')}</span>
-            </div>
             ))
           )}
           
-          <div className="pt-5 mt-2 border-t border-white/5 flex justify-between items-center px-2">
-            <span className="font-medium text-sm text-playbox-text-secondary">Total Pengeluaran</span>
-            <span className="font-bold text-red-400 text-base tracking-tight">-Rp {pengeluaranTotal.toLocaleString('id-ID')}</span>
+          <div className="pt-4 mt-3 border-t border-white/5 flex justify-between items-center px-1">
+            <span className="font-bold text-xs text-playbox-text-secondary">Total Pengeluaran</span>
+            <span className="font-black text-red-400 text-sm tracking-tight">-Rp {pengeluaranTotal.toLocaleString('id-ID')}</span>
           </div>
         </div>
       </div>
 
+      {/* 2-Step Verification Modal for Delete Expense */}
+      {expenseToDelete && (
+        <div className="fixed inset-0 bg-black/80 max-w-md mx-auto backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="glass-surface-elevated w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-red-500/30 text-center space-y-4">
+            <div className="w-14 h-14 bg-red-500/20 rounded-full flex items-center justify-center mx-auto border border-red-500/30 text-2xl animate-pulse">
+              🗑️
+            </div>
+
+            <div>
+              <h3 className="font-bold text-base text-white">Hapus Catatan Pengeluaran?</h3>
+              <p className="text-xs text-white/60 mt-1">Tindakan ini tidak dapat dibatalkan.</p>
+            </div>
+
+            {/* Expense Detail Summary */}
+            <div className="p-3.5 bg-black/40 border border-white/10 rounded-2xl text-left text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-white/50">Kategori:</span>
+                <span className="font-bold text-white">{expenseToDelete.category}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/50">Keterangan:</span>
+                <span className="font-medium text-white truncate max-w-[160px]">{expenseToDelete.desc}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-white/5">
+                <span className="text-white/50">Nominal:</span>
+                <span className="font-black text-red-400">Rp {Number(expenseToDelete.amount).toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+
+            {/* 2-Step Confirmation Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button 
+                type="button" 
+                onClick={() => setExpenseToDelete(null)}
+                disabled={isDeleting}
+                className="py-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl text-xs font-bold text-white transition-all active:scale-95"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="py-3 bg-red-500 hover:bg-red-600 shadow-[0_4px_15px_rgba(239,68,68,0.4)] rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center justify-center"
+              >
+                {isDeleting ? 'Menghapus...' : 'Ya, Hapus Data'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Tambah Pengeluaran */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 max-w-md mx-auto max-w-md mx-auto backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-100 transition-opacity">
-          <div className="glass-surface-elevated w-full max-w-sm rounded-3xl p-6 shadow-2xl scale-100 transition-transform">
-            <h2 className="font-bold text-xl mb-6 tracking-tight">Catat Pengeluaran</h2>
-            <form onSubmit={handleAddExpense} className="space-y-5">
+        <div className="fixed inset-0 bg-black/70 max-w-md mx-auto backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-100 transition-opacity">
+          <div className="glass-surface-elevated w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-white/10">
+            <h2 className="font-bold text-lg mb-5 tracking-tight text-white">Catat Pengeluaran Baru</h2>
+            <form onSubmit={handleAddExpense} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Kategori</label>
+                <label className="block text-[10px] font-bold text-white/60 mb-1.5 uppercase tracking-wider">Kategori</label>
                 <div className="relative">
                   <div 
                     onClick={() => setIsExpenseCategoryOpen(!isExpenseCategoryOpen)}
-                    className={`w-full p-3.5 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isExpenseCategoryOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.2)]' : 'border-white/10 hover:border-white/30'}`}
+                    className={`w-full p-3 rounded-xl bg-black/30 border text-white text-xs flex justify-between items-center cursor-pointer transition-all ${isExpenseCategoryOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.2)]' : 'border-white/10 hover:border-white/20'}`}
                   >
                     <span>{newExpense.category}</span>
-                    <span className={`text-xs opacity-50 transition-transform duration-200 ${isExpenseCategoryOpen ? 'rotate-180' : ''}`}>▼</span>
+                    <span className={`text-[10px] opacity-50 transition-transform duration-200 ${isExpenseCategoryOpen ? 'rotate-180' : ''}`}>▼</span>
                   </div>
                   
                   {isExpenseCategoryOpen && (
@@ -311,7 +474,7 @@ export default function Keuangan() {
                             setNewExpense({...newExpense, category: cat});
                             setIsExpenseCategoryOpen(false);
                           }}
-                          className={`p-3.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${newExpense.category === cat ? 'bg-playbox-accent/20 text-playbox-accent font-semibold border-l-2 border-playbox-accent' : 'text-white/80 hover:bg-white/5 border-l-2 border-transparent'}`}
+                          className={`p-3 text-xs cursor-pointer transition-colors flex items-center justify-between ${newExpense.category === cat ? 'bg-playbox-accent/20 text-playbox-accent font-bold border-l-2 border-playbox-accent' : 'text-white/80 hover:bg-white/5 border-l-2 border-transparent'}`}
                         >
                           {cat}
                           {newExpense.category === cat && <span>✓</span>}
@@ -321,83 +484,80 @@ export default function Keuangan() {
                   )}
                 </div>
               </div>
+
               <div>
-                <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Deskripsi Singkat</label>
+                <label className="block text-[10px] font-bold text-white/60 mb-1.5 uppercase tracking-wider">Deskripsi Singkat</label>
                 <input 
                   type="text" 
                   value={newExpense.desc} 
                   onChange={e => setNewExpense({...newExpense, desc: e.target.value})}
-                  placeholder="Mis: Beli lakban & kardus" 
-                  className="w-full p-3.5 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent focus:ring-1 focus:ring-playbox-accent transition-all placeholder:text-white/20" 
+                  placeholder="Mis: Beli lakban & kabel HDMI" 
+                  className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20" 
                   required 
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Nominal (Rp)</label>
+                <label className="block text-[10px] font-bold text-white/60 mb-1.5 uppercase tracking-wider">Nominal (Rp)</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm">Rp</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 text-xs">Rp</span>
                   <input 
                     type="text" 
                     inputMode="numeric"
                     value={newExpense.amount ? Number(newExpense.amount).toLocaleString('id-ID') : ''} 
                     onChange={e => handleAmountChange(e.target.value)}
                     placeholder="Mis: 150.000" 
-                    className="w-full p-3.5 pl-12 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent focus:ring-1 focus:ring-playbox-accent transition-all placeholder:text-white/20" 
+                    className="w-full p-3 pl-10 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent transition-all placeholder:text-white/20" 
                     required 
                   />
                 </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3.5 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl font-medium text-sm transition-all active:scale-95">Batal</button>
-                <button type="submit" className="flex-1 py-3.5 saas-button rounded-xl font-medium text-sm">Simpan</button>
+
+              <div className="flex space-x-3 pt-3">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl font-bold text-xs transition-all active:scale-95">Batal</button>
+                <button type="submit" className="flex-1 py-3 bg-playbox-accent hover:bg-opacity-90 rounded-xl font-bold text-xs text-white shadow-lg active:scale-95 transition-all">Simpan</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Date Picker (Custom Modern Calendar) */}
+      {/* Modal Date Picker */}
       {showDatePicker && (
-        <div className="fixed inset-0 bg-black/60 max-w-md mx-auto backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-100 transition-opacity">
-          <div className="glass-surface-elevated w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="font-bold text-lg tracking-tight">Pilih Tanggal</h2>
-              <button onClick={() => setShowDatePicker(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors">✕</button>
+        <div className="fixed inset-0 bg-black/70 max-w-md mx-auto backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-100 transition-opacity">
+          <div className="glass-surface-elevated w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95 border border-white/10">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="font-bold text-base tracking-tight text-white">Pilih Tanggal</h2>
+              <button onClick={() => setShowDatePicker(false)} className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors text-xs">✕</button>
             </div>
             
             <div className="space-y-4">
-              
-              {/* Calendar Header */}
-              <div className="flex justify-between items-center mb-4 px-2">
-                <button onClick={handlePrevMonth} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">←</button>
-                <h3 className="font-bold text-sm">{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h3>
-                <button onClick={handleNextMonth} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">→</button>
+              <div className="flex justify-between items-center mb-3 px-2">
+                <button onClick={handlePrevMonth} className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors text-xs">←</button>
+                <h3 className="font-bold text-xs text-white">{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h3>
+                <button onClick={handleNextMonth} className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors text-xs">→</button>
               </div>
 
-              {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-1 text-center">
-                {/* Weekday Labels */}
                 {weekDays.map((wd, i) => (
-                  <div key={i} className="text-[10px] font-bold text-playbox-text-secondary uppercase tracking-wide py-2">
+                  <div key={i} className="text-[9px] font-bold text-playbox-text-secondary uppercase tracking-wide py-1">
                     {wd}
                   </div>
                 ))}
                 
-                {/* Blank days */}
                 {blanks.map(b => (
                   <div key={`blank-${b}`} className="aspect-square"></div>
                 ))}
                 
-                {/* Days */}
                 {days.map(d => {
                   const isSelected = selectedDate && selectedDate.getDate() === d && selectedDate.getMonth() === currentMonth.getMonth() && selectedDate.getFullYear() === currentMonth.getFullYear();
                   return (
                     <button 
                       key={d}
                       onClick={() => setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), d))}
-                      className={`aspect-square flex items-center justify-center text-sm rounded-full transition-all duration-200 ${
+                      className={`aspect-square flex items-center justify-center text-xs rounded-full transition-all ${
                         isSelected 
-                        ? 'bg-playbox-accent text-white font-bold shadow-[0_0_10px_rgba(226,23,142,0.6)] scale-110' 
+                        ? 'bg-playbox-accent text-white font-bold shadow-[0_0_10px_rgba(226,23,142,0.6)] scale-105' 
                         : 'text-white/80 hover:bg-white/10 hover:text-white'
                       }`}
                     >
@@ -416,9 +576,9 @@ export default function Keuangan() {
                       setShowDatePicker(false);
                     }
                   }}
-                  className={`w-full py-3 rounded-xl font-semibold text-sm mt-4 transition-all ${
+                  className={`w-full py-3 rounded-xl font-bold text-xs mt-2 transition-all ${
                     selectedDate 
-                    ? 'saas-button shadow-[0_4px_15px_rgba(226,23,142,0.4)]' 
+                    ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)] active:scale-95' 
                     : 'bg-white/5 text-white/30 cursor-not-allowed'
                   }`}
                 >
@@ -429,7 +589,6 @@ export default function Keuangan() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

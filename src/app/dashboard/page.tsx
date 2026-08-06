@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 
 export default function DashboardHome() {
   const [greeting, setGreeting] = useState("Halo");
   const [businessName, setBusinessName] = useState("PlayBox Malang");
+  const [shopLogo, setShopLogo] = useState<string>("");
   const tier = "PRO";
 
   const [stats, setStats] = useState({
@@ -58,11 +59,24 @@ export default function DashboardHome() {
     };
   }, []);
 
-  const loadDashboardData = (customBookings?: any[]) => {
-    // Dynamic SaaS Loading
+  const loadDashboardData = async (customBookings?: any[]) => {
+    // Dynamic SaaS Loading: Shop Settings & Logo
     const shopSettings = localStorage.getItem('playbox_shop_settings');
     if (shopSettings) {
-      setBusinessName(JSON.parse(shopSettings).brandName);
+      const parsed = JSON.parse(shopSettings);
+      setBusinessName(parsed.brandName || 'PlayBox Rental');
+      setShopLogo(parsed.logo || '');
+    } else {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'shop'));
+        if (snap.exists()) {
+          const d = snap.data();
+          setBusinessName(d.brandName || 'PlayBox Rental');
+          setShopLogo(d.logo || '');
+        }
+      } catch (e) {
+        console.warn('Dashboard logo load fallback:', e);
+      }
     }
 
     const savedUnits = localStorage.getItem('playbox_mock_units');
@@ -93,39 +107,64 @@ export default function DashboardHome() {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           totalRevenue += (Number(b.totalPrice) || 0);
         }
-        if (b.status === 'Sedang Dipakai') {
+        
+        // Check for Overdue & Rent Expiry Alert
+        if (b.status === 'Sedang Dipakai' || b.status === 'Diantar') {
           try {
-            const parts = b.time.split(', ');
-            if (parts.length === 2) {
-              const dateStr = parts[0]; 
-              const timeParts = parts[1].split(' ');
-              const timeStr = timeParts[0]; 
-              const durationStr = timeParts[1]; 
-              
-              const duration = parseInt(durationStr.replace(/\D/g, '')) || 24;
-              const startDate = new Date(`${dateStr}T${timeStr}:00`);
-              const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000);
-              
+            let startDate: Date | null = null;
+            let durationHours = b.duration || 24;
+
+            if (b.isoStart) {
+              startDate = new Date(b.isoStart);
+            } else if (b.time) {
+              const parts = b.time.split(', ');
+              if (parts.length === 2) {
+                const dateStr = parts[0]; 
+                const timeParts = parts[1].split(' ');
+                const timeStr = timeParts[0]; 
+                const durationStr = timeParts[1] || '24';
+                durationHours = parseInt(durationStr.replace(/\D/g, '')) || 24;
+                startDate = new Date(`${dateStr}T${timeStr}:00`);
+              }
+            }
+
+            if (startDate && !isNaN(startDate.getTime())) {
+              const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
               const diffMs = endDate.getTime() - now.getTime();
               const diffMins = diffMs / (1000 * 60);
-              
-              if (diffMins <= 30) {
+
+              if (diffMins < 0) {
+                // Lewat Waktu (Overdue Denda)
+                const lateMins = Math.abs(Math.floor(diffMins));
+                const lateHours = Math.ceil(lateMins / 60);
+                const lateFineRate = 20000;
+                const totalLateEst = lateHours * lateFineRate;
+
                 initialPendingTasks.unshift({
                   ...b,
                   isWarning: true,
-                  warningMsg: diffMins <= 0 ? 'Waktu Sewa Habis!' : 'Waktu Hampir Habis!'
+                  isOverdue: true,
+                  warningMsg: `Lewat ${lateHours} Jam! (Potensi Denda Rp ${(totalLateEst/1000).toFixed(0)}k)`
+                });
+              } else if (diffMins <= 30) {
+                // Hampir Habis (30 min warning)
+                initialPendingTasks.unshift({
+                  ...b,
+                  isWarning: true,
+                  isOverdue: false,
+                  warningMsg: `Sisa ${Math.max(1, Math.ceil(diffMins))} Menit!`
                 });
               }
             }
           } catch (e) {
-            console.error(e);
+            console.error('Error computing overdue time:', e);
           }
         }
       });
       
-      pendingTasks = initialPendingTasks.slice(0, 4);
+      pendingTasks = initialPendingTasks.slice(0, 5);
 
-      // Generate Chart Data
+      // Generate Chart Data (7 Days Revenue)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
@@ -142,6 +181,8 @@ export default function DashboardHome() {
           let bDate = new Date();
           if (b.isoStart) {
             bDate = new Date(b.isoStart);
+          } else if (b.createdAt) {
+            bDate = new Date(b.createdAt);
           }
           bDate.setHours(0, 0, 0, 0);
           const diffDays = Math.floor((today.getTime() - bDate.getTime()) / (1000 * 3600 * 24));
@@ -150,8 +191,6 @@ export default function DashboardHome() {
           }
         }
       });
-
-      // Dummy fallback removed
       
       setChartData({
         data: cData,
@@ -192,91 +231,123 @@ export default function DashboardHome() {
     }
   };
 
+  // Calculate percentage change compared to yesterday
+  const todayRev = chartData.data[6] || 0;
+  const yesterdayRev = chartData.data[5] || 0;
+  let percentChange = 0;
+  if (yesterdayRev > 0) {
+    percentChange = Math.round(((todayRev - yesterdayRev) / yesterdayRev) * 100);
+  } else if (todayRev > 0) {
+    percentChange = 100;
+  }
+
   const summary = [
-    { title: "Unit Disewa", count: stats.unitDisewa, color: "text-playbox-disewa", icon: "💼", href: "/dashboard/unit?filter=Disewa" },
-    { title: "Unit Ready", count: stats.unitReady, color: "text-playbox-ready", icon: "🎮", href: "/dashboard/unit?filter=Ready" },
-    { title: "Maintenance", count: stats.unitMaintenance, color: "text-red-500", icon: "🔧", href: "/dashboard/unit?filter=Maintenance" },
-    { title: "Verifikasi", count: stats.bookingBaru, color: "text-yellow-500", icon: "⏳", href: "/dashboard/booking?filter=Perlu Verifikasi" }
+    { title: "Unit Disewa", count: stats.unitDisewa, color: "text-playbox-disewa", borderColor: "border-pink-500/20 hover:border-pink-500/40", icon: "💼", href: "/dashboard/unit?filter=Disewa" },
+    { title: "Unit Ready", count: stats.unitReady, color: "text-playbox-ready", borderColor: "border-emerald-500/20 hover:border-emerald-500/40", icon: "🎮", href: "/dashboard/unit?filter=Ready" },
+    { title: "Maintenance", count: stats.unitMaintenance, color: "text-red-500", borderColor: "border-red-500/20 hover:border-red-500/40", icon: "🔧", href: "/dashboard/unit?filter=Maintenance" },
+    { title: "Verifikasi", count: stats.bookingBaru, color: "text-yellow-500", borderColor: "border-amber-500/20 hover:border-amber-500/40", icon: "⏳", href: "/dashboard/booking?filter=Perlu Verifikasi" }
   ];
 
   return (
-    <div className="p-4 space-y-8 pb-24 relative">
+    <div className="p-4 space-y-7 pb-24 relative">
       <div className="ambient-glow"></div>
       
-      {/* Header */}
+      {/* Header with Shop Logo */}
       <header className="flex justify-between items-center mt-2 relative z-10">
-        <div>
-          <p className="text-sm text-playbox-text-secondary">{greeting},</p>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold tracking-tight">{businessName}</h1>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gradient-to-r from-playbox-gradient-start to-playbox-gradient-end text-white">
-              {tier}
-            </span>
+        <div className="flex items-center space-x-3">
+          {shopLogo ? (
+            <div className="w-11 h-11 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shrink-0 shadow-md">
+              <img src={shopLogo} alt="Logo" className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-lg font-black text-white shrink-0 shadow-md uppercase">
+              {businessName.charAt(0)}
+            </div>
+          )}
+          <div>
+            <p className="text-xs text-playbox-text-secondary">{greeting},</p>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-base font-bold tracking-tight text-white">{businessName}</h1>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-r from-playbox-gradient-start to-playbox-gradient-end text-white">
+                {tier}
+              </span>
+            </div>
           </div>
         </div>
-        <Link href="/dashboard/booking" className="p-2 glass-surface rounded-full relative transition-transform hover:scale-105 active:scale-95 block">
-          <span className="text-xl">🔔</span>
+
+        <Link href="/dashboard/booking" className="p-2.5 glass-surface rounded-full relative transition-transform hover:scale-105 active:scale-95 block border border-white/10">
+          <span className="text-lg">🔔</span>
           {stats.bookingBaru > 0 && (
             <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-playbox-accent rounded-full border border-playbox-surface shadow-[0_0_8px_rgba(226,23,142,0.8)]"></span>
           )}
         </Link>
       </header>
 
-      {/* Ringkasan Hari Ini */}
+      {/* Ringkasan Hari Ini (Permanent Clear Watermark Icons) */}
       <section className="relative z-10">
-        <h2 className="text-sm font-semibold text-white/80 mb-4 tracking-wide">Ringkasan Hari Ini</h2>
+        <h2 className="text-xs font-bold text-white/70 mb-3 tracking-wider uppercase">Ringkasan Hari Ini</h2>
         <div className="grid grid-cols-2 gap-3">
           {summary.map((item, idx) => (
-            <Link href={item.href} key={idx} className="glass-surface p-4 rounded-2xl flex flex-col items-center justify-center hover:bg-white/5 transition-all duration-200 active:scale-95 relative overflow-hidden">
-              <span className="absolute -bottom-2 -right-1 text-5xl opacity-10 mix-blend-overlay">{item.icon}</span>
-              <span className={`text-3xl font-bold tracking-tighter z-10 relative ${item.color}`}>{item.count}</span>
-              <span className="text-[10px] text-playbox-text-secondary mt-1 text-center font-medium z-10 relative">{item.title}</span>
+            <Link 
+              href={item.href} 
+              key={idx} 
+              className={`glass-surface p-4 rounded-2xl flex flex-col items-center justify-center hover:bg-white/10 transition-all duration-200 active:scale-95 relative overflow-hidden group border ${item.borderColor}`}
+            >
+              {/* Permanent Clear Watermark Icon */}
+              <span className="absolute -bottom-1 -right-1 text-4xl opacity-30 group-hover:opacity-45 transition-opacity select-none pointer-events-none">
+                {item.icon}
+              </span>
+              <span className={`text-3xl font-black tracking-tighter z-10 relative ${item.color}`}>{item.count}</span>
+              <span className="text-[11px] text-white/80 mt-1 text-center font-semibold z-10 relative">{item.title}</span>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Pendapatan Hari Ini */}
+      {/* Pendapatan Hari Ini with Growth Percentage */}
       <section className="relative z-10">
-        <div className="glass-surface-elevated p-6 rounded-3xl relative overflow-hidden">
+        <div className="glass-surface-elevated p-5 rounded-3xl relative overflow-hidden border border-white/10">
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-playbox-ready/20 rounded-full blur-3xl"></div>
-          <h2 className="text-sm font-semibold text-playbox-text-secondary mb-2 uppercase tracking-wider">Pendapatan Hari Ini</h2>
+          <h2 className="text-xs font-bold text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Pendapatan Hari Ini</h2>
+          
           <div className="flex justify-between items-end">
             <div>
-              <p className="text-4xl font-bold tracking-tighter text-white">Rp {revenue.toLocaleString('id-ID')}</p>
-              <p className="text-sm text-playbox-ready font-medium flex items-center mt-2">
-                <span className="bg-playbox-ready/10 text-playbox-ready px-1.5 py-0.5 rounded mr-2">
-                  {revenue > 0 ? '▲ Naik' : '- Stabil'}
+              <p className="text-3xl font-black tracking-tight text-white">Rp {revenue.toLocaleString('id-ID')}</p>
+              
+              <div className="flex items-center mt-2">
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded mr-2 flex items-center ${
+                  percentChange > 0 ? 'bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30' :
+                  percentChange < 0 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                  'bg-white/10 text-white/60 border border-white/10'
+                }`}>
+                  {percentChange > 0 ? `▲ +${percentChange}%` : percentChange < 0 ? `▼ ${percentChange}%` : `0%`}
                 </span> 
-                <span className="text-playbox-text-secondary">dari kemarin</span>
-              </p>
+                <span className="text-playbox-text-secondary text-xs">dari kemarin</span>
+              </div>
             </div>
-            <Link href="/dashboard/keuangan" className="bg-white/10 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors">
+            <Link href="/dashboard/keuangan" className="bg-white/10 text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10 text-sm">
               →
             </Link>
           </div>
           
-          {/* Bar Chart */}
-          <div className="mt-6 pt-4 border-t border-white/5">
-            <div className="flex items-end justify-between h-24 gap-2">
+          {/* 7-Day Bar Chart */}
+          <div className="mt-5 pt-4 border-t border-white/5">
+            <div className="flex items-end justify-between h-20 gap-2">
               {chartData.data.map((val, idx) => {
-                const heightPercent = val === 0 ? 0 : Math.max(5, Math.round((val / chartData.max) * 100));
+                const heightPercent = val === 0 ? 0 : Math.max(8, Math.round((val / chartData.max) * 100));
                 const isToday = idx === 6;
                 return (
                   <div key={idx} className="flex flex-col justify-end items-center flex-1 group relative h-full">
-                    {/* Tooltip on Hover */}
-                    <div className="absolute -top-8 bg-white text-black text-[9px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg z-20">
+                    <div className="absolute -top-7 bg-white text-black text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg z-20">
                       Rp {(val / 1000).toFixed(0)}k
                     </div>
-                    {/* Bar */}
-                    <div className="w-full bg-white/5 rounded-t-sm flex items-end justify-center rounded-b-sm overflow-hidden flex-1 mb-2">
+                    <div className="w-full bg-white/5 rounded-t-sm flex items-end justify-center rounded-b-sm overflow-hidden flex-1 mb-1.5">
                       <div 
                         className={`w-full rounded-t-sm rounded-b-sm transition-all duration-700 ease-out ${isToday ? 'bg-gradient-to-t from-playbox-gradient-start to-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.5)]' : 'bg-white/30 group-hover:bg-white/50'}`} 
                         style={{ height: `${heightPercent}%` }}
                       ></div>
                     </div>
-                    {/* Label */}
-                    <span className={`text-[9px] font-medium ${isToday ? 'text-white' : 'text-white/40'}`}>{chartData.labels[idx]}</span>
+                    <span className={`text-[9px] font-semibold ${isToday ? 'text-white' : 'text-white/40'}`}>{chartData.labels[idx]}</span>
                   </div>
                 );
               })}
@@ -285,115 +356,133 @@ export default function DashboardHome() {
         </div>
       </section>
 
+      {/* Perlu Dikerjakan (Overdue Fines Alert & Urgent Tasks) */}
+      <section className="relative z-10">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-xs font-bold text-white/70 tracking-wider uppercase">Perlu Dikerjakan</h2>
+          <span className="text-[10px] text-white/40">{tasks.length} Tindakan</span>
+        </div>
+
+        <div className="space-y-2.5">
+          {tasks.length > 0 ? tasks.map((task, idx) => (
+            <div 
+              key={task.id || idx} 
+              className={`glass-surface-elevated p-3.5 rounded-2xl flex justify-between items-center border-l-4 group hover:bg-white/5 transition-all ${
+                task.isOverdue ? 'border-l-red-500 bg-red-500/10 border border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 
+                task.isWarning ? 'border-l-amber-400 bg-amber-400/10 border border-amber-400/20' : 
+                task.status === 'Perlu Verifikasi' ? 'border-l-yellow-400' : 'border-l-playbox-accent'
+              }`}
+            >
+              <div className="flex-1 min-w-0 pr-2">
+                <p className="text-xs font-bold truncate flex items-center">
+                  {task.isOverdue && <span className="mr-1.5 text-sm animate-bounce">🚨</span>}
+                  {!task.isOverdue && task.isWarning && <span className="mr-1.5 text-sm animate-pulse">⚠️</span>}
+                  <span className={task.isOverdue ? 'text-red-400 font-extrabold' : 'text-white'}>
+                    {task.isWarning ? task.warningMsg : task.status === 'Perlu Verifikasi' ? `Verifikasi Pembayaran` : `${task.status} - ${task.unit}`}
+                  </span>
+                </p>
+                <p className="text-[11px] text-playbox-text-secondary mt-0.5 truncate">
+                  {task.customer} • {task.unit}
+                </p>
+              </div>
+
+              <Link 
+                href={task.status === 'Perlu Verifikasi' ? '/dashboard/booking' : `/dashboard/booking/${task.id}/timeline`} 
+                className={`${
+                  task.isOverdue ? 'bg-red-500 text-white shadow-[0_4px_15px_rgba(239,68,68,0.4)] hover:bg-red-600' : 
+                  task.isWarning ? 'bg-amber-500 text-white hover:bg-amber-600' : 
+                  task.status === 'Perlu Verifikasi' ? 'saas-button-secondary' : 'saas-button'
+                } text-xs px-3.5 py-2 rounded-xl whitespace-nowrap font-bold transition-all active:scale-95`}
+              >
+                {task.isOverdue ? 'Tarik & Denda' : task.isWarning ? 'Cek Unit' : task.status === 'Perlu Verifikasi' ? 'Cek' : 'Update'}
+              </Link>
+            </div>
+          )) : (
+            <div className="glass-surface p-6 rounded-3xl text-center border border-white/5">
+              <span className="text-2xl block mb-1 opacity-50">✨</span>
+              <p className="text-xs font-bold text-white/90">Semua Tugas Beres!</p>
+              <p className="text-[10px] text-playbox-text-secondary mt-0.5">Belum ada tugas mendesak hari ini.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Performa Unit */}
       <section className="relative z-10">
-        <h2 className="text-sm font-semibold text-white/80 mb-4 tracking-wide">Performa Unit Terlaris</h2>
-        <div className="glass-surface p-5 rounded-3xl space-y-5">
+        <h2 className="text-xs font-bold text-white/70 mb-3 tracking-wider uppercase">Performa Unit Terlaris</h2>
+        <div className="glass-surface p-4 rounded-3xl space-y-4 border border-white/5">
           {topUnits.length > 0 ? topUnits.map((u, idx) => {
             const maxRev = Math.max(...topUnits.map(x => x.revenue)) || 1;
             const percentage = Math.round((u.revenue / maxRev) * 100);
             
             return (
               <div key={idx} className="relative group">
-                <div className="flex justify-between items-end mb-2 relative z-10">
+                <div className="flex justify-between items-end mb-1.5 relative z-10">
                   <div>
-                    <p className="text-xs font-bold text-white mb-0.5 flex items-center">
+                    <p className="text-xs font-bold text-white flex items-center">
                       {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'} <span className="ml-1.5">{u.name}</span>
                     </p>
                     <p className="text-[10px] text-playbox-text-secondary">{u.count}x Disewa</p>
                   </div>
                   <p className="text-xs font-black text-playbox-accent">Rp {u.revenue.toLocaleString('id-ID')}</p>
                 </div>
-                {/* Horizontal Progress Bar */}
-                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-playbox-gradient-start to-playbox-accent rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(226,23,142,0.4)] relative"
+                    className="h-full bg-gradient-to-r from-playbox-gradient-start to-playbox-accent rounded-full transition-all duration-700"
                     style={{ width: `${percentage}%` }}
-                  >
-                    <div className="absolute inset-0 bg-white/20 w-1/3 skew-x-12 animate-[shimmer_2s_infinite]"></div>
-                  </div>
+                  ></div>
                 </div>
               </div>
             );
           }) : (
-            <p className="text-xs text-white/40 text-center py-4">Belum ada data penyewaan unit.</p>
+            <p className="text-xs text-white/40 text-center py-3">Belum ada data penyewaan unit.</p>
           )}
         </div>
       </section>
 
       {/* Aksi Cepat */}
       <section className="relative z-10">
-        <h2 className="text-sm font-semibold text-white/80 mb-4 tracking-wide">Aksi Cepat</h2>
+        <h2 className="text-xs font-bold text-white/70 mb-3 tracking-wider uppercase">Aksi Cepat</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Link href="/dashboard/booking/new" className="glass-surface p-4 rounded-xl flex items-center space-x-3 hover:bg-white/5 transition-all duration-200 group active:scale-[0.98]">
-            <div className="w-10 h-10 rounded-lg bg-playbox-accent/10 flex items-center justify-center text-playbox-accent group-hover:bg-playbox-accent group-hover:text-white transition-colors">
+          <Link href="/dashboard/booking/new" className="glass-surface p-3.5 rounded-2xl flex items-center space-x-3 hover:bg-white/5 transition-all duration-200 group active:scale-[0.98] border border-white/5">
+            <div className="w-9 h-9 rounded-xl bg-playbox-accent/15 flex items-center justify-center text-playbox-accent group-hover:bg-playbox-accent group-hover:text-white transition-colors text-sm">
               ➕
             </div>
-            <span className="font-medium text-sm">Catat Booking<br/>Manual (WA)</span>
+            <span className="font-semibold text-xs text-white">Catat Booking<br/>Manual (WA)</span>
           </Link>
-          <Link href="/dashboard/unit/new" className="glass-surface p-4 rounded-xl flex items-center space-x-3 hover:bg-white/5 transition-all duration-200 group active:scale-[0.98]">
-            <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-white group-hover:bg-white/10 transition-colors">
+          <Link href="/dashboard/unit/new" className="glass-surface p-3.5 rounded-2xl flex items-center space-x-3 hover:bg-white/5 transition-all duration-200 group active:scale-[0.98] border border-white/5">
+            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white group-hover:bg-white/10 transition-colors text-sm">
               🎮
             </div>
-            <span className="font-medium text-sm">Tambah<br/>Unit</span>
+            <span className="font-semibold text-xs text-white">Tambah<br/>Unit Baru</span>
           </Link>
-        </div>
-      </section>
-
-      {/* Perlu Dikerjakan */}
-      <section className="relative z-10">
-        <h2 className="text-sm font-semibold text-white/80 mb-4 tracking-wide">Perlu Dikerjakan</h2>
-        <div className="space-y-3">
-          {tasks.length > 0 ? tasks.map((task, idx) => (
-            <div key={task.id || idx} className={`glass-surface-elevated p-4 rounded-xl flex justify-between items-center border-l-2 group hover:bg-white/5 transition-colors ${task.isWarning ? 'border-l-red-500 bg-red-500/10' : task.status === 'Perlu Verifikasi' ? 'border-l-yellow-400' : 'border-l-playbox-accent'}`}>
-              <div>
-                <p className="text-sm font-bold truncate max-w-[200px] flex items-center">
-                  {task.isWarning && <span className="mr-2 text-red-500 animate-pulse">⚠️</span>}
-                  {task.isWarning ? task.warningMsg : task.status === 'Perlu Verifikasi' ? `Verifikasi Pembayaran` : `${task.status} - ${task.unit}`}
-                </p>
-                <p className="text-xs text-playbox-text-secondary mt-0.5 truncate max-w-[200px]">
-                  {task.customer} • {task.isWarning ? 'Unit harus ditarik' : task.time}
-                </p>
-              </div>
-              <Link href={task.status === 'Perlu Verifikasi' ? '/dashboard/booking' : `/dashboard/booking/${task.id}/timeline`} className={`${task.isWarning ? 'bg-red-500 text-white shadow-[0_4px_15px_rgba(239,68,68,0.4)]' : task.status === 'Perlu Verifikasi' ? 'saas-button-secondary' : 'saas-button'} text-xs px-4 py-2 rounded-lg whitespace-nowrap ml-2`}>
-                {task.isWarning ? 'Tarik Unit' : task.status === 'Perlu Verifikasi' ? 'Cek' : 'Update'}
-              </Link>
-            </div>
-          )) : (
-            <div className="glass-surface p-6 rounded-3xl text-center border border-white/5">
-              <span className="text-3xl block mb-2 opacity-50">✨</span>
-              <p className="text-sm font-bold text-white/90">Semua Tugas Beres!</p>
-              <p className="text-xs text-playbox-text-secondary mt-1">Belum ada tugas mendesak hari ini.</p>
-            </div>
-          )}
         </div>
       </section>
 
       {/* Aktivitas Terakhir */}
       <section className="relative z-10 pb-4">
-        <h2 className="text-sm font-semibold text-white/80 mb-4 tracking-wide">Aktivitas Terakhir</h2>
+        <h2 className="text-xs font-bold text-white/70 mb-3 tracking-wider uppercase">Aktivitas Terakhir</h2>
         <div className="space-y-2">
           {recentBookings.length > 0 ? recentBookings.map((b, idx) => (
-            <div key={idx} className="glass-surface p-3.5 rounded-2xl flex justify-between items-center hover:bg-white/5 transition-colors border border-white/5">
+            <div key={idx} className="glass-surface p-3 rounded-2xl flex justify-between items-center hover:bg-white/5 transition-colors border border-white/5">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs">
+                <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-xs">
                   {b.status === 'Selesai' ? '✅' : b.status === 'Sedang Dipakai' ? '🎮' : '⏳'}
                 </div>
                 <div>
                   <p className="text-xs font-bold text-white/90 truncate max-w-[150px]">{b.customer}</p>
-                  <p className="text-[10px] text-playbox-text-secondary mt-0.5">{b.unit} • {b.status}</p>
+                  <p className="text-[10px] text-playbox-text-secondary">{b.unit} • {b.status}</p>
                 </div>
               </div>
-              <span className="text-[11px] font-bold text-playbox-ready">
+              <span className="text-xs font-bold text-playbox-ready">
                 {b.totalPrice ? `Rp ${(b.totalPrice/1000).toFixed(0)}k` : '-'}
               </span>
             </div>
           )) : (
-             <p className="text-xs text-white/40 text-center py-6 glass-surface rounded-2xl border border-white/5">Belum ada aktivitas transaksi.</p>
+            <p className="text-xs text-white/40 text-center py-2">Belum ada aktivitas.</p>
           )}
         </div>
       </section>
-
     </div>
   );
 }

@@ -31,14 +31,17 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const [address, setAddress] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [submittedBooking, setSubmittedBooking] = useState<any>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
   const [displayShopName, setDisplayShopName] = useState<string>('');
   const [shopProfile, setShopProfile] = useState<{
     brandName?: string;
     phone?: string;
+    instagram?: string;
     address?: string;
     bio?: string;
+    logo?: string;
   }>({});
 
   useEffect(() => {
@@ -73,12 +76,11 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         setShopProfile(loadedProfile);
       }
       
-      // Fetch units
+      // Fetch units from local storage initially
       const savedUnits = localStorage.getItem('playbox_mock_units');
       if (savedUnits) {
         setUnits(JSON.parse(savedUnits));
       } else {
-        // Fallback
         const defaultUnits = [
           {
             id: 'U01', name: 'PS5 Premium Set (#01)', type: 'PlayStation 5', status: 'Ready', price: 150000, 
@@ -99,48 +101,26 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
     fetchStoreData();
 
-    // Real-time listener for active bookings to automatically reflect unit availability across all devices
-    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const activeBookings = snapshot.docs
-        .map(doc => doc.data())
-        .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
-      
-      const busyUnitKeys = new Set(
-        activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
-      );
-
-      setUnits(prev => prev.map(u => {
-        if (u.status === 'Maintenance') return u;
-        const isBusy = busyUnitKeys.has(u.id) || busyUnitKeys.has(u.name);
-        return {
-          ...u,
-          status: isBusy ? 'Disewa' : 'Ready'
-        };
-      }));
-    }, (err) => {
-      console.warn('Store bookings listener err:', err);
+    // Setup Realtime Listener for Units Availability
+    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
+      if (!snapshot.empty) {
+        const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUnits(liveUnits);
+        localStorage.setItem('playbox_mock_units', JSON.stringify(liveUnits));
+      }
+    }, (error) => {
+      console.warn('Units realtime listener fallback in store:', error);
     });
 
-    const handleStorage = (e: StorageEvent) => {
-      if (['playbox_mock_units', 'playbox_shop_settings'].includes(e.key || '')) {
-        fetchStoreData();
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      unsubBookings();
-    };
-
+    return () => unsubscribeUnits();
   }, [unwrappedParams.shopId]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
       setKtpFileName(file.name);
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onload = () => {
         setKtpDataUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
@@ -148,11 +128,11 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   };
 
   const handlePaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
       setPaymentProofFileName(file.name);
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onload = () => {
         setPaymentProofDataUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
@@ -161,40 +141,57 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedUnit || !customerName || !customerPhone || !ktpDataUrl || !address) {
+      alert('Mohon lengkapi semua formulir dan upload foto KTP!');
+      return;
+    }
+
+    if (!startDate || !startTime) {
+      alert('Mohon pilih tanggal dan jam mulai sewa!');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Create new booking
       const savedBookings = localStorage.getItem('playbox_mock_bookings');
-      let bookings = savedBookings ? JSON.parse(savedBookings) : [];
+      const bookings = savedBookings ? JSON.parse(savedBookings) : [];
       
-      const newId = `B0${new Date().getTime().toString().slice(-4)}`;
-      
-      const start = startDate && startTime ? new Date(`${startDate}T${startTime}`) : new Date();
-      const end = new Date(start.getTime() + duration * 60 * 60 * 1000);
+      const newId = `B0${bookings.length + 1}`;
+      const randomInv = Math.floor(100000 + Math.random() * 900000);
+      const invoiceCode = `INV-${randomInv}`;
+
+      const totalDays = duration / 24;
+      const basePrice = selectedUnit.price * totalDays;
+      const calculatedTotalPrice = basePrice;
+
+      const formattedStartDate = format(new Date(startDate), 'yyyy-MM-dd');
+      const isoStartDateTime = `${formattedStartDate}T${startTime}:00`;
+      const timeDisplay = `${formattedStartDate}, ${startTime} (${duration === 12 ? '12 Jam' : duration === 168 ? '1 Minggu' : `${duration/24} Hari`})`;
 
       const newBooking = {
         id: newId,
-        code: `INV-${new Date().getTime().toString().slice(-6)}`,
+        code: invoiceCode,
         customer: customerName,
         customerPhone: customerPhone,
         unit: selectedUnit.name,
         unitId: selectedUnit.id,
+        time: timeDisplay,
+        isoStart: isoStartDateTime,
+        duration: duration,
         status: 'Perlu Verifikasi',
-        statusColor: 'bg-yellow-500/15 text-yellow-500',
-        time: start.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        date: start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-        isoStart: start.toISOString(),
-        isoEnd: end.toISOString(),
-        durationHours: duration,
+        statusColor: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
+        paymentStatus: 'Belum Lunas',
+        deliveryStatus: requireDelivery ? 'Diantar (+Ongkir)' : 'Ambil di Toko',
         requireDelivery: requireDelivery,
-        deliveryAddress: address,
-        deliveryFee: 0, // Akan dihitung oleh admin nanti
-        totalPrice: selectedUnit.price * (duration / 24),
-        ktpPhoto: ktpDataUrl,
-        paymentProof: paymentProofDataUrl,
+        address: address,
+        totalPrice: calculatedTotalPrice,
+        unitPrice: selectedUnit.price,
+        deliveryFee: 0,
+        ktpUrl: ktpDataUrl,
+        paymentProofUrl: paymentProofDataUrl || null,
         needAction: true,
-        source: 'Etalase Online',
+        fines: null,
         createdAt: new Date().toISOString()
       };
 
@@ -209,6 +206,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       bookings.push(newBooking);
       localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
       
+      setSubmittedBooking(newBooking);
       setIsSubmitting(false);
       setShowSuccess(true);
     } catch (error) {
@@ -218,94 +216,131 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     }
   };
 
+  const handleCloseModal = () => {
+    setShowSuccess(false);
+    setSelectedUnit(null);
+    setSubmittedBooking(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setKtpFileName('');
+    setKtpDataUrl('');
+    setPaymentProofFileName('');
+    setPaymentProofDataUrl('');
+    setAddress('');
+    setRequireDelivery(false);
+    setDuration(24);
+  };
+
   return (
     <div className="min-h-screen bg-playbox-bg text-playbox-text-primary font-sans relative overflow-x-hidden">
       {/* Dynamic Background */}
       <div className="ambient-glow"></div>
       
       {/* Header */}
-      <header className="relative z-10 p-6 pt-10 text-center pb-6 border-b border-white/5 bg-black/20 backdrop-blur-md">
-        <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-3xl font-black text-white shadow-[0_10px_30px_rgba(226,23,142,0.4)] mb-3 uppercase">
-          {displayShopName ? displayShopName.charAt(0) : 'P'}
+      <header className="relative z-10 p-5 pt-8 text-center pb-6 border-b border-white/5 bg-black/30 backdrop-blur-md">
+        
+        {/* Custom Logo / Initial Avatar */}
+        <div className="w-20 h-20 mx-auto rounded-3xl bg-black/40 border border-white/15 flex items-center justify-center shadow-[0_10px_30px_rgba(226,23,142,0.3)] mb-3 overflow-hidden">
+          {shopProfile.logo ? (
+            <img src={shopProfile.logo} alt="Shop Logo" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-3xl font-black text-white uppercase">
+              {displayShopName ? displayShopName.charAt(0) : 'P'}
+            </div>
+          )}
         </div>
+
         <h1 className="text-2xl font-black tracking-tight text-white mb-1">{displayShopName}</h1>
         <p className="text-xs text-playbox-text-secondary max-w-xs mx-auto mb-3">
           {shopProfile.bio || 'Pusat Sewa PlayStation 5 & PS4 Premium Terpercaya'}
         </p>
 
         {shopProfile.address && (
-          <p className="text-[11px] text-white/50 flex items-center justify-center mb-3">
+          <p className="text-[11px] text-white/60 flex items-center justify-center mb-3.5 px-4">
             <span className="mr-1">📍</span> {shopProfile.address}
           </p>
         )}
 
-        {shopProfile.phone && (
-          <button 
-            onClick={() => {
-              let p = shopProfile.phone || '';
-              if (p.startsWith('0')) p = '62' + p.substring(1);
-              window.open(`https://wa.me/${p}?text=${encodeURIComponent(`Halo ${displayShopName}, saya ingin bertanya seputar sewa konsol PlayStation.`)}`, '_blank');
-            }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.2)]"
-          >
-            <span>💬</span> Tanya CS WhatsApp
-          </button>
-        )}
+        {/* Action Contact Buttons (WA CS & Instagram) */}
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          {shopProfile.phone && (
+            <button 
+              onClick={() => {
+                let p = shopProfile.phone || '';
+                if (p.startsWith('0')) p = '62' + p.substring(1);
+                window.open(`https://wa.me/${p}?text=${encodeURIComponent(`Halo ${displayShopName}, saya ingin bertanya seputar sewa konsol PlayStation.`)}`, '_blank');
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.15)]"
+            >
+              <span>💬</span> WhatsApp CS
+            </button>
+          )}
+
+          {shopProfile.instagram && (
+            <button 
+              onClick={() => {
+                const ig = shopProfile.instagram?.replace(/^@/, '').trim();
+                window.open(`https://instagram.com/${ig}`, '_blank');
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-xs font-bold hover:bg-pink-500/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(226,23,142,0.15)]"
+            >
+              <span>📸</span> Instagram
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-lg mx-auto p-4 space-y-6 pb-24">
-        <div className="flex justify-between items-end mb-2">
-          <h2 className="text-lg font-bold text-white tracking-tight">Katalog Unit</h2>
-          <span className="text-xs text-white/50">{units.filter(u => u.status === 'Ready').length} Unit Tersedia</span>
+      <main className="relative z-10 max-w-lg mx-auto p-4 space-y-5 pb-24">
+        <div className="flex justify-between items-end mb-1">
+          <h2 className="text-base font-bold text-white tracking-tight">Katalog Unit PlayStation</h2>
+          <span className="text-[11px] text-white/50">{units.filter(u => u.status === 'Ready').length} Unit Tersedia</span>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {units.map(unit => (
-            <div key={unit.id} className="glass-surface rounded-3xl p-4 flex gap-4 overflow-hidden relative group">
-              <div className="w-28 h-28 rounded-2xl overflow-hidden shrink-0 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-black/20 to-black/60 mix-blend-overlay z-10"></div>
-                <img src={unit.image} alt={unit.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                <div className="absolute bottom-2 left-2 right-2 z-20">
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full block text-center uppercase tracking-wider backdrop-blur-md ${unit.status === 'Ready' ? 'bg-[#25D366]/20 text-[#25D366]' : 'bg-red-500/20 text-red-400'}`}>
+            <div key={unit.id} className="glass-surface rounded-3xl p-3.5 flex gap-3.5 overflow-hidden relative group border border-white/5">
+              <div className="w-24 h-24 rounded-2xl overflow-hidden shrink-0 relative bg-black/40">
+                <img src={unit.image} alt={unit.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute bottom-1.5 left-1.5 right-1.5 z-20">
+                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full block text-center uppercase tracking-wider backdrop-blur-md ${unit.status === 'Ready' ? 'bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40' : 'bg-red-500/30 text-red-300 border border-red-500/40'}`}>
                     {unit.status}
                   </span>
                 </div>
               </div>
               
-              <div className="flex-1 min-w-0 py-1 flex flex-col">
-                <h3 className="font-bold text-base text-white truncate">{unit.name}</h3>
-                <div className="flex flex-wrap gap-1 mt-1 mb-2">
-                  {unit.specs?.map((spec: string, idx: number) => (
-                    <span key={`s-${idx}`} className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 border border-white/5">
-                      {spec}
-                    </span>
-                  ))}
-                  {unit.games?.map((game: string, idx: number) => (
-                    <span key={`g-${idx}`} className="text-[9px] px-1.5 py-0.5 rounded bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20">
-                      {game}
-                    </span>
-                  ))}
-                  {(!unit.specs?.length && !unit.games?.length) && (
-                    <span className="text-[11px] text-white/60">{unit.type}</span>
-                  )}
+              <div className="flex-1 min-w-0 py-0.5 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-white truncate">{unit.name}</h3>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {unit.specs?.slice(0, 2).map((spec: string, idx: number) => (
+                      <span key={`s-${idx}`} className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                        {spec}
+                      </span>
+                    ))}
+                    {unit.games?.slice(0, 2).map((game: string, idx: number) => (
+                      <span key={`g-${idx}`} className="text-[8px] px-1.5 py-0.5 rounded bg-playbox-accent/10 text-playbox-accent border border-playbox-accent/20">
+                        {game}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 
-                <div className="mt-auto flex justify-between items-end">
+                <div className="flex justify-between items-end mt-2 pt-1 border-t border-white/5">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Sewa 24 Jam</p>
-                    <p className="text-sm font-black text-white">Rp {(unit.price || 0).toLocaleString('id-ID')}</p>
+                    <p className="text-[9px] uppercase tracking-wider text-white/40">Tarif / 24 Jam</p>
+                    <p className="text-xs font-black text-white">Rp {(unit.price || 0).toLocaleString('id-ID')}</p>
                   </div>
                   <button 
                     onClick={() => setSelectedUnit(unit)}
                     disabled={unit.status !== 'Ready'}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                       unit.status === 'Ready' 
-                      ? 'bg-playbox-accent text-white hover:bg-opacity-90 active:scale-95 shadow-[0_4px_15px_rgba(226,23,142,0.4)]' 
+                      ? 'bg-playbox-accent text-white hover:bg-opacity-90 active:scale-95 shadow-[0_4px_12px_rgba(226,23,142,0.35)]' 
                       : 'bg-white/5 text-white/30 cursor-not-allowed'
                     }`}
                   >
-                    {unit.status === 'Ready' ? 'Booking' : 'Tidak Tersedia'}
+                    {unit.status === 'Ready' ? 'Booking' : 'Disewa'}
                   </button>
                 </div>
               </div>
@@ -314,109 +349,113 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         </div>
       </main>
 
-      {/* Booking Modal */}
+      {/* Booking / Success Modal (Compact Mobile Bottom-Sheet) */}
       {selectedUnit && (
-        <div className={`fixed inset-0 z-50 max-w-md mx-auto flex justify-center bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-300 ${showSuccess ? 'items-center p-4' : 'items-end sm:items-center p-0 sm:p-4'}`}>
-          <div className={`w-full max-w-md bg-[#0A0F1F] shadow-2xl border border-white/10 overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 ${showSuccess ? 'rounded-3xl' : 'rounded-t-3xl sm:rounded-3xl'}`}>
+        <div className={`fixed inset-0 z-50 max-w-md mx-auto flex justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${showSuccess ? 'items-center p-4' : 'items-end sm:items-center p-0 sm:p-4'}`}>
+          <div className={`w-full max-w-md bg-[#0D1122] shadow-2xl border border-white/10 overflow-hidden flex flex-col max-h-[88vh] animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 ${showSuccess ? 'rounded-3xl' : 'rounded-t-3xl sm:rounded-3xl'}`}>
+            
             {/* Modal Header */}
-            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5">
+            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
               <div>
-                <h3 className="font-bold text-lg text-white">Formulir Booking</h3>
-                <p className="text-[11px] text-white/60">{selectedUnit.name}</p>
+                <h3 className="font-bold text-base text-white">{showSuccess ? 'Status Pemesanan' : 'Formulir Booking'}</h3>
+                <p className="text-[10px] text-white/50">{selectedUnit.name}</p>
               </div>
               <button 
-                onClick={() => {
-                  setShowSuccess(false);
-                  setSelectedUnit(null);
-                  setCustomerName('');
-                  setCustomerPhone('');
-                  setKtpFileName('');
-                  setKtpDataUrl('');
-                  setAddress('');
-                  setRequireDelivery(false);
-                  setDuration(24);
-                }}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 transition-colors"
+                onClick={handleCloseModal}
+                className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 transition-colors text-xs"
               >
                 ✕
               </button>
             </div>
 
-            {/* Modal Body (Scrollable) */}
+            {/* Modal Body */}
             {showSuccess ? (
-              <div className="p-8 text-center flex-1 overflow-y-auto">
-                <div className="flex flex-col items-center justify-center min-h-full pb-4">
-                  <div className="w-20 h-20 bg-[#25D366]/20 rounded-full flex items-center justify-center mb-4 border border-[#25D366]/30 animate-bounce shrink-0">
-                    <span className="text-4xl">✅</span>
-                  </div>
-                  <h2 className="text-xl font-bold text-white mb-2">Booking Berhasil!</h2>
-                  <p className="text-sm text-white/60 mb-6">Pesanan Anda telah masuk dan sedang menunggu persetujuan admin rental.</p>
-
-                  <button 
-                    onClick={() => {
-                      setShowSuccess(false);
-                      setSelectedUnit(null);
-                      setCustomerName('');
-                      setCustomerPhone('');
-                      setKtpFileName('');
-                      setKtpDataUrl('');
-                      setPaymentProofFileName('');
-                      setPaymentProofDataUrl('');
-                      setAddress('');
-                      setRequireDelivery(false);
-                      setDuration(24);
-                    }}
-                    className="w-full py-4 mt-2 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold transition-all text-sm"
-                  >
-                    Tutup & Kembali ke Katalog
-                  </button>
+              <div className="p-6 text-center space-y-4">
+                <div className="w-16 h-16 bg-[#25D366]/20 rounded-full flex items-center justify-center mx-auto border border-[#25D366]/40 shadow-[0_0_20px_rgba(37,211,102,0.2)] animate-bounce">
+                  <span className="text-3xl">✅</span>
                 </div>
+
+                <div>
+                  <h2 className="text-lg font-black text-white">Booking Berhasil Diajukan!</h2>
+                  <p className="text-xs text-white/60 mt-1 max-w-xs mx-auto">
+                    Pesanan Anda telah masuk dan sedang menunggu persetujuan admin rental.
+                  </p>
+                </div>
+
+                {/* Compact Booking Summary */}
+                {submittedBooking && (
+                  <div className="bg-black/40 border border-white/10 rounded-2xl p-4 text-left space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-white/50">ID Invoice:</span>
+                      <span className="font-bold text-white">{submittedBooking.code}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/50">Unit:</span>
+                      <span className="font-bold text-white truncate max-w-[170px]">{submittedBooking.unit}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/50">Jadwal:</span>
+                      <span className="font-medium text-white">{submittedBooking.time}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-white/5">
+                      <span className="text-white/50">Total Biaya:</span>
+                      <span className="font-black text-playbox-accent">Rp {submittedBooking.totalPrice?.toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                )}
+
+                <button 
+                  onClick={handleCloseModal}
+                  className="w-full py-3.5 bg-playbox-accent text-white rounded-xl font-bold transition-all text-xs shadow-lg active:scale-95"
+                >
+                  Selesai & Kembali ke Katalog
+                </button>
               </div>
             ) : (
-              <div className="p-5 overflow-y-auto flex-1">
+              <div className="p-4 overflow-y-auto flex-1 space-y-4">
                 <form id="booking-form" onSubmit={handleSubmit} className="space-y-4">
                   
-                  {/* 1. Durasi Sewa */}
+                  {/* Durasi Sewa */}
                   <div>
-                    <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Durasi Sewa</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[12, 24, 48, 72, 168].map(h => (
+                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1.5">Durasi Sewa</label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[12, 24, 48, 72].map(h => (
                         <button 
                           key={h}
                           type="button"
                           onClick={() => setDuration(h)}
-                          className={`p-2 rounded-xl border text-[11px] font-bold transition-all ${duration === h ? 'bg-playbox-accent/20 border-playbox-accent text-playbox-accent' : 'bg-black/40 border-white/5 text-white/60 hover:bg-white/5'}`}
+                          className={`py-2 rounded-xl border text-[11px] font-bold transition-all ${duration === h ? 'bg-playbox-accent/20 border-playbox-accent text-playbox-accent shadow-sm' : 'bg-black/30 border-white/5 text-white/60 hover:bg-white/5'}`}
                         >
-                          {h === 12 ? '12 Jam' : h === 168 ? '1 Minggu' : `${h/24} Hari`}
+                          {h === 12 ? '12 Jam' : `${h/24} Hari`}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* 1.5 Tanggal & Jam Booking */}
-                  <div className="grid grid-cols-2 gap-3 relative">
+                  {/* Tanggal & Jam Mulai */}
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Tanggal Sewa</label>
+                      <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Tanggal Sewa</label>
                       <div 
                         onClick={() => { setIsDatePickerOpen(!isDatePickerOpen); setIsTimePickerOpen(false); }}
-                        className={`w-full p-4 rounded-xl bg-black/40 border text-sm flex justify-between items-center cursor-pointer transition-all ${isDatePickerOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.2)] text-white' : 'border-white/5 text-white/80'}`}
+                        className={`w-full p-3 rounded-xl bg-black/30 border text-xs flex justify-between items-center cursor-pointer transition-all ${isDatePickerOpen ? 'border-playbox-accent text-white' : 'border-white/10 text-white/80'}`}
                       >
-                        {startDate ? format(new Date(startDate), 'dd MMM yyyy', { locale: idLocale }) : <span className="text-white/40">Tanggal</span>}
-                        <span className="opacity-70">📅</span>
+                        <span className="truncate">{startDate ? format(new Date(startDate), 'dd MMM yyyy', { locale: idLocale }) : 'Pilih Tanggal'}</span>
+                        <span className="opacity-70 text-xs">📅</span>
                       </div>
                       
                       {isDatePickerOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                          <div className="p-5 bg-playbox-surface border border-white/10 rounded-3xl shadow-2xl relative max-w-[320px] w-full flex flex-col items-center">
-                            <div className="w-full flex justify-between items-center mb-4">
-                              <h3 className="text-white font-bold text-sm">Pilih Tanggal</h3>
-                              <button type="button" onClick={() => setIsDatePickerOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors">✕</button>
+                          <div className="p-4 bg-playbox-surface border border-white/10 rounded-2xl shadow-2xl relative max-w-[300px] w-full flex flex-col items-center">
+                            <div className="w-full flex justify-between items-center mb-3">
+                              <h3 className="text-white font-bold text-xs">Pilih Tanggal</h3>
+                              <button type="button" onClick={() => setIsDatePickerOpen(false)} className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-white/50 text-xs">✕</button>
                             </div>
                             <style>{`
-                              .rdp { --rdp-cell-size: 38px; --rdp-accent-color: #e2178e; --rdp-background-color: rgba(226,23,142,0.2); margin: 0; }
+                              .rdp { --rdp-cell-size: 34px; --rdp-accent-color: #e2178e; --rdp-background-color: rgba(226,23,142,0.2); margin: 0; }
                               .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: var(--rdp-accent-color); color: white; font-weight: bold; }
                               .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: rgba(255,255,255,0.1); }
-                              .rdp-day { color: white; }
+                              .rdp-day { color: white; font-size: 12px; }
                             `}</style>
                             <DayPicker
                               mode="single"
@@ -434,75 +473,34 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Jam Mulai</label>
+                      <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Jam Mulai</label>
                       <div 
                         onClick={() => { 
                           setTempTime(startTime || '08:00'); 
                           setIsTimePickerOpen(true); 
                           setIsDatePickerOpen(false); 
                         }}
-                        className={`w-full p-4 rounded-xl bg-black/40 border text-sm flex justify-between items-center cursor-pointer transition-all ${isTimePickerOpen ? 'border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.2)]' : 'border-white/5 text-white/80'}`}
+                        className={`w-full p-3 rounded-xl bg-black/30 border text-xs flex justify-between items-center cursor-pointer transition-all ${isTimePickerOpen ? 'border-playbox-accent text-white' : 'border-white/10 text-white/80'}`}
                       >
-                        {startTime || <span className="text-white/40">00:00</span>}
-                        <span className="opacity-70">⏰</span>
+                        <span>{startTime || 'Pilih Jam'}</span>
+                        <span className="opacity-70 text-xs">⏰</span>
                       </div>
                       
                       {isTimePickerOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                          <div className="bg-playbox-surface p-6 border border-white/10 rounded-3xl shadow-2xl relative max-w-[320px] w-full">
-                            <div className="flex justify-between items-center mb-6">
-                              <h3 className="text-white font-bold text-sm">Pilih Waktu Sewa</h3>
-                              <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors">✕</button>
-                            </div>
-                            
-                            {/* Direct Input */}
-                            <div className="flex justify-center items-center space-x-3 mb-8">
-                              <input 
-                                type="text" 
-                                maxLength={2} 
-                                value={tempTime.split(':')[0]} 
-                                onChange={(e) => {
-                                   let h = e.target.value.replace(/\D/g, '');
-                                   if (parseInt(h) > 23) h = '23';
-                                   setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
-                                }}
-                                onBlur={(e) => {
-                                   let h = e.target.value;
-                                   if (h.length === 1) h = '0' + h;
-                                   if (h.length === 0) h = '00';
-                                   setTempTime(`${h}:${tempTime.split(':')[1] || '00'}`);
-                                }}
-                                className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl text-4xl text-center font-bold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
-                              />
-                              <span className="text-4xl font-bold text-white/30 pb-2">:</span>
-                              <input 
-                                type="text" 
-                                maxLength={2} 
-                                value={tempTime.split(':')[1] || '00'} 
-                                onChange={(e) => {
-                                   let m = e.target.value.replace(/\D/g, '');
-                                   if (parseInt(m) > 59) m = '59';
-                                   setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
-                                }}
-                                onBlur={(e) => {
-                                   let m = e.target.value;
-                                   if (m.length === 1) m = '0' + m;
-                                   if (m.length === 0) m = '00';
-                                   setTempTime(`${tempTime.split(':')[0] || '00'}:${m}`);
-                                }}
-                                className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl text-4xl text-center font-bold text-white focus:border-playbox-accent focus:bg-playbox-accent/10 focus:outline-none transition-all" 
-                              />
+                          <div className="p-4 bg-playbox-surface border border-white/10 rounded-2xl shadow-2xl relative max-w-[280px] w-full">
+                            <div className="flex justify-between items-center mb-3">
+                              <h3 className="text-white font-bold text-xs">Pilih Jam Mulai</h3>
+                              <button type="button" onClick={() => setIsTimePickerOpen(false)} className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-white/50 text-xs">✕</button>
                             </div>
 
-                            {/* Quick Select Grid */}
-                            <p className="text-[10px] text-white/40 text-center mb-3 uppercase tracking-widest">Pilih Cepat</p>
-                            <div className="grid grid-cols-4 gap-2 mb-6">
+                            <div className="grid grid-cols-4 gap-2 mb-4">
                               {['08:00', '10:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'].map(t => (
                                 <button 
                                   key={t}
                                   type="button"
                                   onClick={() => setTempTime(t)}
-                                  className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10 hover:text-white'}`}
+                                  className={`py-2 rounded-lg text-xs font-bold border transition-all ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10'}`}
                                 >
                                   {t}
                                 </button>
@@ -515,7 +513,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                                 setStartTime(tempTime);
                                 setIsTimePickerOpen(false);
                               }}
-                              className="w-full py-4 bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(226,23,142,0.3)] hover:scale-[1.02] transition-transform"
+                              className="w-full py-2.5 bg-playbox-accent text-white font-bold rounded-xl text-xs"
                             >
                               Simpan Jam
                             </button>
@@ -525,35 +523,35 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     </div>
                   </div>
 
-                  {/* 2. Nama Lengkap */}
+                  {/* Nama Lengkap */}
                   <div>
-                    <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Nama Lengkap</label>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Nama Lengkap</label>
                     <input 
                       type="text" 
                       value={customerName}
                       onChange={e => setCustomerName(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent transition-colors"
-                      placeholder="Masukkan nama Anda"
+                      className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent"
+                      placeholder="Nama penyewa..."
                       required
                     />
                   </div>
 
-                  {/* 3. No WhatsApp */}
+                  {/* No WhatsApp */}
                   <div>
-                    <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">No. WhatsApp</label>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">No. WhatsApp</label>
                     <input 
                       type="tel" 
                       value={customerPhone}
                       onChange={e => setCustomerPhone(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent transition-colors"
-                      placeholder="0812xxxxxx"
+                      className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent"
+                      placeholder="0812xxxxxxx"
                       required
                     />
                   </div>
                   
-                  {/* 4. Upload KTP */}
+                  {/* Upload KTP */}
                   <div>
-                    <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Upload KTP (Jaminan)</label>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Upload KTP (Jaminan)</label>
                     <div className="relative">
                       <input 
                         type="file" 
@@ -562,71 +560,60 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         required
                       />
-                      <div className={`w-full p-4 rounded-xl border flex items-center justify-between transition-colors ${ktpFileName ? 'bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]' : 'bg-black/40 border-white/5 text-white/50'}`}>
-                        <span className="text-sm truncate mr-2">{ktpFileName || 'Pilih Foto KTP...'}</span>
-                        <span className="text-lg">{ktpFileName ? '✅' : '📷'}</span>
+                      <div className={`w-full p-3 rounded-xl border flex items-center justify-between transition-colors ${ktpFileName ? 'bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]' : 'bg-black/30 border-white/10 text-white/50'}`}>
+                        <span className="text-xs truncate mr-2">{ktpFileName || 'Pilih Foto KTP...'}</span>
+                        <span className="text-sm">{ktpFileName ? '✅' : '📷'}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* 5. Metode Pengiriman */}
+                  {/* Metode Pengiriman */}
                   <div>
-                    <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Metode Pengiriman</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className={`flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer transition-all ${!requireDelivery ? 'bg-playbox-accent/20 border-playbox-accent text-white' : 'bg-black/40 border-white/5 text-white/50'}`}>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Metode Pengiriman</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className={`flex items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all ${!requireDelivery ? 'bg-playbox-accent/20 border-playbox-accent text-white' : 'bg-black/30 border-white/5 text-white/50'}`}>
                         <input type="radio" name="delivery" checked={!requireDelivery} onChange={() => setRequireDelivery(false)} className="hidden" />
-                        <span className="text-xl mb-1">🏪</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Ambil di Toko</span>
+                        <span className="text-xs font-bold">🏪 Ambil di Toko</span>
                       </label>
-                      <label className={`flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer transition-all ${requireDelivery ? 'bg-playbox-accent/20 border-playbox-accent text-white' : 'bg-black/40 border-white/5 text-white/50'}`}>
+                      <label className={`flex items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all ${requireDelivery ? 'bg-playbox-accent/20 border-playbox-accent text-white' : 'bg-black/30 border-white/5 text-white/50'}`}>
                         <input type="radio" name="delivery" checked={requireDelivery} onChange={() => setRequireDelivery(true)} className="hidden" />
-                        <span className="text-xl mb-1">🛵</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Diantar (+Ongkir)</span>
+                        <span className="text-xs font-bold">🛵 Diantar (+Ongkir)</span>
                       </label>
                     </div>
                   </div>
 
-                  {/* 6. Alamat Lengkap */}
+                  {/* Alamat Lengkap */}
                   <div>
-                    <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Alamat Lengkap (Wajib)</label>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Alamat Lengkap</label>
                     <textarea 
                       value={address}
                       onChange={e => setAddress(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent transition-colors min-h-[80px]"
+                      className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent resize-none min-h-[60px]"
                       placeholder="Detail alamat domisili..."
                       required
                     />
                   </div>
 
-                  {/* 7. Pembayaran (Hanya jika Ambil di Toko) */}
+                  {/* Pembayaran Toko jika Ambil di Toko */}
                   {!requireDelivery && paymentMethods.length > 0 && (
-                    <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
-                      <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider ml-1">Silakan Transfer DP/Lunas ke:</label>
-                      <div className="bg-black/40 rounded-2xl border border-white/10 p-4 text-left">
-                        <div className="space-y-4">
-                          {paymentMethods.map((pm, idx) => (
-                            <div key={idx} className="bg-white/5 p-4 rounded-xl border border-white/5">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest ${pm.type === 'QRIS' ? 'bg-[#25D366]/20 text-[#25D366]' : 'bg-white/10 text-white/70'}`}>
-                                {pm.type}
-                              </span>
-                              <h4 className="font-bold text-white mt-2">{pm.name}</h4>
-                              
-                              {pm.type === 'QRIS' ? (
-                                <div className="mt-2 flex justify-center bg-white p-2 rounded-xl">
-                                  <img src={pm.qrisImage} alt="QRIS" className="w-40 h-40 object-contain" />
-                                </div>
-                              ) : (
-                                <p className="font-mono text-lg tracking-widest text-white mt-1">{pm.account}</p>
-                              )}
-                              <p className="text-xs text-white/60 mt-1">a.n. {pm.owner}</p>
+                    <div className="pt-3 border-t border-white/5 space-y-3">
+                      <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider">Transfer Pembayaran ke:</label>
+                      <div className="bg-black/40 rounded-xl border border-white/10 p-3 space-y-2">
+                        {paymentMethods.map((pm, idx) => (
+                          <div key={idx} className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-white">{pm.name}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/60">{pm.type}</span>
                             </div>
-                          ))}
-                        </div>
+                            <p className="font-mono text-sm font-bold text-playbox-accent mt-0.5">{pm.account}</p>
+                            <p className="text-[10px] text-white/50">a.n. {pm.owner}</p>
+                          </div>
+                        ))}
                       </div>
 
-                      {/* 8. Upload Bukti Transfer */}
+                      {/* Upload Bukti */}
                       <div>
-                        <label className="block text-[11px] font-bold text-white/60 uppercase tracking-wider mb-1.5 ml-1">Upload Bukti Transfer</label>
+                        <label className="block text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1">Upload Bukti Transfer</label>
                         <div className="relative">
                           <input 
                             type="file" 
@@ -635,43 +622,44 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                             required={!requireDelivery}
                           />
-                          <div className={`w-full p-4 rounded-xl border flex items-center justify-between transition-colors ${paymentProofFileName ? 'bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]' : 'bg-black/40 border-white/5 text-white/50'}`}>
-                            <span className="text-sm truncate mr-2">{paymentProofFileName || 'Pilih Foto Bukti Transfer...'}</span>
-                            <span className="text-lg">{paymentProofFileName ? '✅' : '📷'}</span>
+                          <div className={`w-full p-3 rounded-xl border flex items-center justify-between transition-colors ${paymentProofFileName ? 'bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]' : 'bg-black/30 border-white/10 text-white/50'}`}>
+                            <span className="text-xs truncate mr-2">{paymentProofFileName || 'Pilih Bukti Transfer...'}</span>
+                            <span className="text-sm">{paymentProofFileName ? '✅' : '📷'}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  <div className="mt-6 pt-4 border-t border-white/5 flex justify-between items-center">
+                  {/* Summary Footer */}
+                  <div className="pt-3 border-t border-white/5 flex justify-between items-center">
                     <div>
-                      <p className="text-[10px] text-white/50 uppercase tracking-wider mb-0.5">Harga Sewa Unit</p>
-                      <p className="text-xl font-black text-white">Rp {(selectedUnit.price * (duration / 24)).toLocaleString('id-ID')}</p>
-                      {requireDelivery && (
-                        <p className="text-[9px] text-playbox-accent font-bold mt-1">+ Ongkir menyusul (Dihitung Admin)</p>
-                      )}
+                      <p className="text-[9px] text-white/50 uppercase tracking-wider">Tarif Sewa</p>
+                      <p className="text-base font-black text-white">Rp {(selectedUnit.price * (duration / 24)).toLocaleString('id-ID')}</p>
                     </div>
+                    {requireDelivery && (
+                      <p className="text-[9px] text-playbox-accent font-bold">+ Ongkir Diinfokan Admin</p>
+                    )}
                   </div>
                 </form>
               </div>
             )}
             
-            {/* Modal Footer */}
+            {/* Modal Footer Button */}
             {!showSuccess && (
-              <div className="p-4 border-t border-white/5 bg-black/40 backdrop-blur-md">
+              <div className="p-3.5 border-t border-white/5 bg-black/40 backdrop-blur-md">
                 <button 
                   type="submit"
                   form="booking-form"
                   disabled={isSubmitting || !customerName || !customerPhone || !ktpFileName || !address || (!requireDelivery && paymentMethods.length > 0 && !paymentProofFileName)}
-                  className="w-full py-4 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(226,23,142,0.4)] tracking-wide hover:bg-opacity-90 active:scale-95 transition-all text-sm flex items-center justify-center disabled:opacity-50 disabled:active:scale-100"
+                  className="w-full py-3.5 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_4px_15px_rgba(226,23,142,0.35)] tracking-wide hover:bg-opacity-90 active:scale-95 transition-all text-xs flex items-center justify-center disabled:opacity-50 disabled:active:scale-100"
                 >
                   {isSubmitting ? (
                     <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                       Memproses...
                     </span>
-                  ) : 'Ajukan Booking'}
+                  ) : 'Ajukan Booking Sekarang'}
                 </button>
               </div>
             )}
