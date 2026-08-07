@@ -18,6 +18,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [customerInstagram, setCustomerInstagram] = useState('');
   const [duration, setDuration] = useState(24);
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('10:00');
@@ -241,8 +243,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUnit || !customerName || !customerPhone || !ktpDataUrl || !address) {
-      alert('Mohon lengkapi semua formulir dan upload foto KTP!');
+    if (!selectedUnit || !customerName || !customerPhone || !emergencyPhone || !ktpDataUrl || !address) {
+      alert('Mohon lengkapi semua formulir, kontak darurat, dan upload foto KTP!');
       return;
     }
 
@@ -278,6 +280,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         code: invoiceCode,
         customer: customerName,
         customerPhone: customerPhone,
+        emergencyPhone: emergencyPhone,
+        instagram: customerInstagram,
         unit: selectedUnit.name,
         unitId: selectedUnit.id,
         time: timeDisplay,
@@ -338,6 +342,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     setSubmittedBooking(null);
     setCustomerName('');
     setCustomerPhone('');
+    setEmergencyPhone('');
+    setCustomerInstagram('');
     setKtpFileName('');
     setKtpDataUrl('');
     setPaymentProofFileName('');
@@ -759,6 +765,31 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                       className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent"
                       placeholder="Contoh: 081234567890"
                       required
+                    />
+                  </div>
+
+                  {/* No Darurat */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">No. HP Darurat (Wajib)</label>
+                    <input 
+                      type="tel" 
+                      value={emergencyPhone}
+                      onChange={e => setEmergencyPhone(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent"
+                      placeholder="Keluarga / Kerabat dekat..."
+                      required
+                    />
+                  </div>
+
+                  {/* Instagram */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Username Instagram (Opsional)</label>
+                    <input 
+                      type="text" 
+                      value={customerInstagram}
+                      onChange={e => setCustomerInstagram(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-playbox-accent"
+                      placeholder="@username"
                     />
                   </div>
                   
