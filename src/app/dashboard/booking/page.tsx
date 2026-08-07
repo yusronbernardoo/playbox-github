@@ -173,7 +173,7 @@ export default function BookingList() {
 
       return (
         <div key={booking.id} className="glass-surface p-4 rounded-3xl relative overflow-hidden group hover:bg-white/5 transition-all duration-300">
-          <Link href={`/dashboard/booking/${booking.id}/verify`} className="absolute inset-0 z-0"></Link>
+          <Link href={booking.needAction ? `/dashboard/booking/${booking.id}/verify` : `/dashboard/booking/${booking.id}/timeline`} className="absolute inset-0 z-0"></Link>
           
           <div className="relative z-10 pointer-events-none">
             {booking.needAction && (
