@@ -102,10 +102,10 @@ export default function Keuangan() {
 
     const filterBookingPeriod = (b: any, isPrevious: boolean = false) => {
       let bDate: Date | null = null;
-      if (b.isoStart || b.startTime) {
-        bDate = new Date(b.isoStart || b.startTime);
-      } else if (b.createdAt) {
+      if (b.createdAt) {
         bDate = new Date(b.createdAt);
+      } else if (b.isoStart || b.startTime) {
+        bDate = new Date(b.isoStart || b.startTime);
       } else if (b.time) {
         const parts = b.time.split(', ');
         if (parts.length >= 1) bDate = new Date(parts[0]);

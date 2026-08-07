@@ -193,10 +193,10 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
       localBookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           let bDate: Date | null = null;
-          if (b.isoStart || b.startTime) {
-            bDate = new Date(b.isoStart || b.startTime);
-          } else if (b.createdAt) {
+          if (b.createdAt) {
             bDate = new Date(b.createdAt);
+          } else if (b.isoStart || b.startTime) {
+            bDate = new Date(b.isoStart || b.startTime);
           } else if (b.time) {
             const parts = b.time.split(', ');
             if (parts.length >= 1) {
@@ -252,6 +252,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
   // Calculate precise Today & Yesterday Revenue
   let todayRev = 0;
   let yesterdayRev = 0;
+  let allTimeRev = 0;
   
   const activeLocalBookings = bookings && bookings.length > 0 ? bookings : [];
 
@@ -262,10 +263,10 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     activeLocalBookings.forEach((b: any) => {
       if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
         let bDate: Date | null = null;
-        if (b.isoStart || b.startTime) {
-          bDate = new Date(b.isoStart || b.startTime);
-        } else if (b.createdAt) {
+        if (b.createdAt) {
           bDate = new Date(b.createdAt);
+        } else if (b.isoStart || b.startTime) {
+          bDate = new Date(b.isoStart || b.startTime);
         } else if (b.time) {
           const parts = b.time.split(', ');
           if (parts.length >= 1) bDate = new Date(parts[0]);
@@ -277,6 +278,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
         } else if (bDate.getDate() === yesterday.getDate() && bDate.getMonth() === yesterday.getMonth() && bDate.getFullYear() === yesterday.getFullYear()) {
           yesterdayRev += (Number(b.totalPrice) || 0);
         }
+        allTimeRev += (Number(b.totalPrice) || 0);
       }
     });
   }
