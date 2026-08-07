@@ -1,12 +1,13 @@
 'use client';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { db } from '@/lib/firebase';
-import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, query, where } from 'firebase/firestore';
+import { toPng } from 'html-to-image';
 
 export default function StorefrontPage({ params }: { params: Promise<{ shopId: string }> }) {
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   const [showSuccess, setShowSuccess] = useState(false);
   const [submittedBooking, setSubmittedBooking] = useState<any>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [activeBookingsList, setActiveBookingsList] = useState<any[]>([]);
 
   const [displayShopName, setDisplayShopName] = useState<string>('');
   const [zoomedQris, setZoomedQris] = useState<string | null>(null);
@@ -47,6 +49,29 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     bio?: string;
     logo?: string;
   }>({});
+
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showSuccess && submittedBooking && invoiceRef.current) {
+      // Beri sedikit jeda agar gambar dan font ter-render dengan baik
+      const timer = setTimeout(() => {
+        toPng(invoiceRef.current as HTMLElement, { backgroundColor: '#ffffff', cacheBust: true, pixelRatio: 2 })
+          .then((dataUrl) => {
+            const link = document.createElement('a');
+            link.download = `Invoice-${submittedBooking.code}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          })
+          .catch((err) => {
+            console.error('Gagal membuat gambar tagihan', err);
+          });
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccess, submittedBooking]);
 
   // Helper functions for Dynamic Price Tiers
   const getUnitTiers = (unit: any) => {
@@ -171,10 +196,16 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       }
     });
 
-    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const activeBookings = snapshot.docs
-        .map(doc => doc.data())
-        .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
+    // 2. Real-time Units & Active Bookings Listener
+    // OPTIMIZED: Only fetch active bookings so it loads instantly!
+    const activeBookingsQuery = query(
+      collection(db, 'bookings'),
+      where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa'])
+    );
+    
+    const unsubscribeBookings = onSnapshot(activeBookingsQuery, (snapshot) => {
+      const activeBookings = snapshot.docs.map(doc => doc.data());
+      setActiveBookingsList(activeBookings);
       
       activeBusyKeys = new Set(
         activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
@@ -245,6 +276,12 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     e.preventDefault();
     if (!selectedUnit || !customerName || !customerPhone || !emergencyPhone || !ktpDataUrl || !address) {
       alert('Mohon lengkapi semua formulir, kontak darurat, dan upload foto KTP!');
+      return;
+    }
+
+    // Cek apakah nomor HP sudah ada di booking aktif
+    if (activeBookingsList.some(b => b.customerPhone === customerPhone)) {
+      alert('Nomor ini masih memiliki sewa aktif! Mohon selesaikan sewa sebelumnya.');
       return;
     }
 
@@ -990,6 +1027,82 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
             >
               Tutup QRIS
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Komponen Invoice Rahasia (Untuk Download) */}
+      {showSuccess && submittedBooking && (
+        <div className="absolute top-[-9999px] left-[-9999px]">
+          <div ref={invoiceRef} className="w-[480px] bg-white text-black p-8 font-sans">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-black">{displayShopName || 'Playbox Rental'}</h1>
+              <p className="text-sm text-gray-500">INVOICE PENYEWAAN</p>
+            </div>
+            
+            <div className="flex justify-between items-center border-b pb-4 mb-4">
+              <div>
+                <p className="text-xs text-gray-500">Kode Invoice</p>
+                <p className="font-bold">{submittedBooking.code}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Tanggal Booking</p>
+                <p className="font-bold">{format(new Date(submittedBooking.createdAt), 'dd MMM yyyy')}</p>
+              </div>
+            </div>
+
+            <div className="mb-6 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Penyewa:</span>
+                <span className="font-bold">{submittedBooking.customer}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">No. HP:</span>
+                <span className="font-bold">{submittedBooking.customerPhone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Unit:</span>
+                <span className="font-bold text-blue-600">{submittedBooking.unit}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Durasi:</span>
+                <span className="font-bold">{submittedBooking.durationLabel}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Mulai:</span>
+                <span className="font-bold">{format(new Date(submittedBooking.isoStart), 'dd MMM yyyy, HH:mm')}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 py-4 mb-4">
+              <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+                <span className="font-bold">Total Tagihan</span>
+                <span className="text-xl font-black text-green-600">Rp {Number(submittedBooking.totalPrice).toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+
+            {/* QRIS Section */}
+            {paymentMethods.filter(p => p.type === 'QRIS' && p.qrisImage).length > 0 && (
+              <div className="text-center mt-6 p-4 border rounded-xl bg-gray-50">
+                <p className="font-bold text-sm mb-3">Scan QRIS untuk Pembayaran</p>
+                <div className="w-48 h-48 mx-auto bg-white p-2 border rounded-xl shadow-sm flex items-center justify-center overflow-hidden">
+                  <img src={paymentMethods.find(p => p.type === 'QRIS' && p.qrisImage)?.qrisImage} alt="QRIS" className="w-full h-full object-contain" crossOrigin="anonymous" />
+                </div>
+                <p className="text-xs text-gray-500 mt-3">Silakan bayar menggunakan Gopay, OVO, Dana, ShopeePay, atau BCA Mobile.</p>
+              </div>
+            )}
+            
+            {!paymentMethods.some(p => p.type === 'QRIS' && p.qrisImage) && paymentMethods.length > 0 && (
+              <div className="mt-4 p-4 border rounded-xl bg-gray-50">
+                <p className="font-bold text-sm mb-2 text-center">Rekening Pembayaran</p>
+                {paymentMethods.map(p => (
+                  <div key={p.id} className="text-sm flex justify-between border-b last:border-0 py-2">
+                    <span className="text-gray-600">{p.name}</span>
+                    <span className="font-bold">{p.account} (a.n {p.owner})</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
