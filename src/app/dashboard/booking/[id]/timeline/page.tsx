@@ -99,24 +99,29 @@ export default function TimelineBooking() {
         const currentIdx = idx !== -1 ? idx + 1 : 1;
         setCurrentStage(currentIdx);
 
-        // Generate logical mock times for past stages
-        const times: Record<number, string> = {};
-        if (b.time) {
-          try {
-            const [datePart, timePart] = b.time.split(', ');
-            const [hStr, mStr] = timePart.split(':');
-            let baseDate = new Date();
-            baseDate.setHours(parseInt(hStr), parseInt(mStr), 0);
+        // Load precise completed times from Firestore if available
+        if (b.completedTimes && Object.keys(b.completedTimes).length > 0) {
+          setCompletedTimes(b.completedTimes);
+        } else {
+          // Generate logical mock times only for past stages if completely missing
+          const times: Record<number, string> = {};
+          if (b.time) {
+            try {
+              const [datePart, timePart] = b.time.split(', ');
+              const [hStr, mStr] = timePart.split(':');
+              let baseDate = new Date();
+              baseDate.setHours(parseInt(hStr), parseInt(mStr), 0);
 
-            for (let i = 1; i < currentIdx; i++) {
-              times[i] = baseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              baseDate.setMinutes(baseDate.getMinutes() + Math.floor(Math.random() * 20) + 5);
+              for (let i = 1; i < currentIdx; i++) {
+                times[i] = baseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                baseDate.setMinutes(baseDate.getMinutes() + Math.floor(Math.random() * 20) + 5);
+              }
+            } catch (e) {
+              // fallback
             }
-          } catch (e) {
-            // fallback
           }
+          setCompletedTimes(times);
         }
-        setCompletedTimes(times);
       }
     });
 
@@ -168,7 +173,8 @@ export default function TimelineBooking() {
       
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setCompletedTimes(prev => ({ ...prev, [currentStage]: timeStr }));
+      const newCompletedTimes = { ...completedTimes, [currentStage]: timeStr };
+      setCompletedTimes(newCompletedTimes);
       setCurrentStage(prev => prev + 1);
 
       let color = 'bg-white/10 text-white';
@@ -185,6 +191,7 @@ export default function TimelineBooking() {
             status: cleanStatus,
             statusColor: color,
             needAction: false,
+            completedTimes: newCompletedTimes,
             updatedAt: new Date().toISOString()
           });
         }
@@ -202,7 +209,8 @@ export default function TimelineBooking() {
               ...b,
               status: cleanStatus,
               statusColor: color,
-              needAction: false
+              needAction: false,
+              completedTimes: newCompletedTimes
             };
           }
           return b;

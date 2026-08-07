@@ -110,7 +110,7 @@ export default function DashboardHome() {
         if (u.status === 'Maintenance') {
           maintenanceU++;
         } else {
-          const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
+          const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name) || u.status === 'Disewa' || u.status === 'Sedang Dipakai';
           if (isBusy) disewaU++;
           else readyU++;
         }
@@ -260,8 +260,32 @@ export default function DashboardHome() {
   };
 
   // Calculate percentage change compared to yesterday
-  const todayRev = chartData.data[6] || 0;
-  const yesterdayRev = chartData.data[5] || 0;
+  // Calculate precise Today & Yesterday Revenue
+  let todayRev = 0;
+  let yesterdayRev = 0;
+  
+  if (bookings && bookings.length > 0) {
+    const now = new Date();
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    
+    bookings.forEach((b: any) => {
+      if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
+        let bDate = new Date();
+        if (b.isoStart || b.startTime) bDate = new Date(b.isoStart || b.startTime);
+        else if (b.createdAt) bDate = new Date(b.createdAt);
+        else if (b.time) {
+          const parts = b.time.split(', ');
+          if (parts.length >= 1) bDate = new Date(parts[0]);
+        }
+        
+        if (bDate.getDate() === now.getDate() && bDate.getMonth() === now.getMonth() && bDate.getFullYear() === now.getFullYear()) {
+          todayRev += (Number(b.totalPrice) || 0);
+        } else if (bDate.getDate() === yesterday.getDate() && bDate.getMonth() === yesterday.getMonth() && bDate.getFullYear() === yesterday.getFullYear()) {
+          yesterdayRev += (Number(b.totalPrice) || 0);
+        }
+      }
+    });
+  }
   let percentChange = 0;
   if (yesterdayRev > 0) {
     percentChange = Math.round(((todayRev - yesterdayRev) / yesterdayRev) * 100);
