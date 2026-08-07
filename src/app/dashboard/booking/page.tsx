@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { useFirebase } from '@/context/FirebaseContext';
+import { formatSmartCountdown } from '@/lib/format';
 
 export default function BookingList() {
   const { bookings } = useFirebase();
@@ -159,11 +160,9 @@ export default function BookingList() {
             
             if (startMs && now < startMs) {
               const diffToStart = startMs - now;
-              const h = Math.floor(diffToStart / (1000 * 60 * 60));
-              const m = Math.floor((diffToStart % (1000 * 60 * 60)) / (1000 * 60));
               timerBadge = (
                 <span className="bg-yellow-500 text-black text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(234,179,8,0.6)]">
-                  ⏳ Mulai: {h}J {m}M
+                  ⏳ Mulai: {formatSmartCountdown(diffToStart)}
                 </span>
               );
             } else {
@@ -176,11 +175,9 @@ export default function BookingList() {
                   </span>
                 );
               } else {
-                const h = Math.floor(diff / (1000 * 60 * 60));
-                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                 timerBadge = (
                   <span className="bg-playbox-accent text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(37,99,235,0.6)]">
-                    ⏱️ Sisa: {h}J {m}M
+                    ⏱️ Sisa: {formatSmartCountdown(diff)}
                   </span>
                 );
               }

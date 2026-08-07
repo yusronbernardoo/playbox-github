@@ -4,6 +4,7 @@ import { toPng } from 'html-to-image';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
+import { formatSmartCountdown } from '@/lib/format';
 
 export default function TimelineBooking() {
   const { id } = useParams();
@@ -142,9 +143,7 @@ export default function TimelineBooking() {
           return;
         }
 
-        const h = Math.floor(diff / (1000 * 60 * 60));
-        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        setTimeLeft(`${h} Jam ${m} Menit`);
+        setTimeLeft(formatSmartCountdown(diff).replace('J ', ' Jam ').replace('M', ' Menit'));
       };
 
       calculateTimeLeft();

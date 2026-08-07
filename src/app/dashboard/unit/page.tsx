@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { formatSmartDuration } from '@/lib/format';
 
 export default function UnitList() {
   const router = useRouter();
@@ -260,7 +261,7 @@ export default function UnitList() {
                     <p className="text-[10px] font-medium text-yellow-500/80 truncate">
                       🗓️ {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
                       <span className="opacity-70 ml-1">
-                        (Selama {unit.nextBooking.durationHours || unit.nextBooking.duration || 24} Jam)
+                        (Selama {formatSmartDuration(Number(unit.nextBooking.durationHours || unit.nextBooking.duration || 24))})
                       </span>
                     </p>
                   </div>

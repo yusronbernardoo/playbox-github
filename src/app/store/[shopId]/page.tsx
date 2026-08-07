@@ -8,6 +8,7 @@ import { id as idLocale } from 'date-fns/locale';
 import { db } from '@/lib/firebase';
 import { collection, doc, onSnapshot, setDoc, query, where } from 'firebase/firestore';
 import { toPng } from 'html-to-image';
+import { formatSmartDuration } from '@/lib/format';
 
 export default function StorefrontPage({ params }: { params: Promise<{ shopId: string }> }) {
   const router = useRouter();
@@ -575,7 +576,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                       </p>
                       <p className="text-[9px] font-medium text-orange-400/90 leading-tight">
                         {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
-                        <span className="opacity-70 ml-1">({unit.nextBooking.durationHours || unit.nextBooking.duration || 24} Jam)</span>
+                        <span className="opacity-70 ml-1">({formatSmartDuration(Number(unit.nextBooking.durationHours || unit.nextBooking.duration || 24))})</span>
                       </p>
                       <p className="text-[8px] text-orange-500/60 mt-1 italic leading-tight">Silakan sewa jika durasi Anda tidak menabrak jadwal ini.</p>
                     </div>
