@@ -163,61 +163,73 @@ export default function BookingList() {
               );
             }
           }
+               const getBadgeStyle = (status: string) => {
+        if (status === 'Selesai') return 'bg-playbox-ready/10 text-playbox-ready border border-playbox-ready/20';
+        if (status === 'Sedang Dipakai' || status === 'Diantar') return 'bg-playbox-disewa/10 text-playbox-disewa border border-playbox-disewa/20';
+        if (status === 'Dibatalkan') return 'bg-red-500/10 text-red-500 border border-red-500/20';
+        if (status === 'Perlu Verifikasi' || status === 'Menunggu Pembayaran') return 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20';
+        return 'bg-blue-500/10 text-blue-500 border border-blue-500/20'; // default/Persiapan
+      };
 
-          return (
-            <div key={booking.id} className="glass-surface rounded-3xl p-5 flex flex-col group hover:bg-white/5 transition-all duration-300 relative overflow-hidden border border-white/10">
-              {booking.needAction && (
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
-              )}
-              
-              <div className="flex justify-between items-start gap-3 mb-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-bold text-playbox-accent mb-1 tracking-wider">{booking.code}</p>
-                  <h3 className="font-bold text-lg tracking-tight text-white/90 truncate" title={booking.customer}>{booking.customer}</h3>
+      return (
+        <div key={booking.id} className="glass-surface p-4 rounded-3xl relative overflow-hidden group hover:bg-white/5 transition-all duration-300">
+          <Link href={`/dashboard/booking/${booking.id}/verify`} className="absolute inset-0 z-0"></Link>
+          
+          <div className="relative z-10 pointer-events-none">
+            {booking.needAction && (
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
+            )}
+            
+            <div className="flex justify-between items-start gap-3 mb-3 pointer-events-auto">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-playbox-accent mb-1 tracking-wider">{booking.code}</p>
+                <h3 className="font-bold text-lg tracking-tight text-white/90 truncate" title={booking.customer}>{booking.customer}</h3>
+              </div>
+              <div className="text-right shrink-0">
+                <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block mb-1 ${getBadgeStyle(booking.status)}`}>
+                  {booking.status}
+                </span>
+                <p className="text-sm font-black text-playbox-ready whitespace-nowrap">Rp {Number(booking.totalPrice || 0).toLocaleString('id-ID')}</p>
+              </div>
+            </div>
+            
+            <div className="text-sm text-playbox-text-secondary mb-4 space-y-3 pointer-events-auto">
+              <div className="flex justify-between items-center gap-2">
+                <p className="flex items-center text-white/90 font-bold min-w-0 flex-1 truncate">
+                  <span className="w-2 h-2 rounded-full bg-playbox-accent mr-2 shrink-0"></span> <span className="truncate">{booking.unit}</span>
+                </p>
+                <p className="text-xs font-medium text-white/50 shrink-0">{durHours} Jam</p>
+              </div>
+
+              <div className="bg-black/40 p-3 rounded-2xl border border-white/5 shadow-inner">
+                <div className="flex justify-between items-center text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5 px-1">
+                  <span>Mulai Sewa</span>
+                  <span className="opacity-50 text-playbox-accent">&rarr;</span>
+                  <span>Akhir Sewa</span>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block mb-1 ${booking.statusColor}`}>
-                    {booking.status}
-                  </span>
-                  <p className="text-sm font-black text-playbox-ready whitespace-nowrap">Rp {Number(booking.totalPrice || 0).toLocaleString('id-ID')}</p>
+                <div className="flex justify-between items-center text-xs font-medium text-white/80 px-1">
+                  <span>{formattedStart}</span>
+                  <span>{formattedEnd}</span>
                 </div>
+                
+                {timerBadge && (
+                  <div className="mt-3 flex justify-end">
+                    {timerBadge}
+                  </div>
+                )}
               </div>
               
-              <div className="text-sm text-playbox-text-secondary mb-4 space-y-3">
-                <div className="flex justify-between items-center gap-2">
-                  <p className="flex items-center text-white/90 font-bold min-w-0 flex-1 truncate">
-                    <span className="w-2 h-2 rounded-full bg-playbox-accent mr-2 shrink-0"></span> <span className="truncate">{booking.unit}</span>
-                  </p>
-                  <span className="text-xs font-semibold text-white/60 shrink-0 whitespace-nowrap">
-                    {durHours === 168 ? '1 Minggu' : durHours >= 24 ? `${durHours/24} Hari` : `${durHours} Jam`}
-                  </span>
-                </div>
-                
-                {/* Clean Date Box with Time and Automatic Live Countdown */}
-                <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 flex flex-col space-y-2 relative">
-                  <div className="flex justify-between items-center text-xs">
-                    <div className="flex-1">
-                      <p className="text-[9px] uppercase tracking-wider text-white/40 font-bold mb-0.5">Mulai Sewa</p>
-                      <p className="font-semibold text-white/90">{formattedStart}</p>
-                    </div>
-                    <div className="px-2 text-white/30">➔</div>
-                    <div className="flex-1 text-right">
-                      <p className="text-[9px] uppercase tracking-wider text-white/40 font-bold mb-0.5">Akhir Sewa</p>
-                      <p className="font-semibold text-white/90">{formattedEnd}</p>
-                    </div>
-                  </div>
-
-                  {timerBadge && (
-                    <div className="pt-2 border-t border-white/5 flex justify-end">
-                      {timerBadge}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="pt-1 flex flex-col space-y-1.5 border-t border-white/5">
-                  <p className="flex items-center text-xs text-white/70 min-w-0"><span className="opacity-60 mr-2 shrink-0">📞</span> <span className="truncate flex-1">{booking.customerPhone || '-'}</span></p>
-                  <p className="flex items-start text-xs text-white/70 min-w-0"><span className="opacity-60 mr-2 shrink-0 mt-0.5">🛵</span> <span className="flex-1 leading-snug truncate">{booking.requireDelivery ? `Diantar: ${booking.deliveryAddress || booking.address || '-'}` : 'Ambil di Toko (Mandiri)'}</span></p>
-                </div>
+              <div className="pt-1 flex flex-col space-y-1.5 border-t border-white/5">
+                <p className="flex items-center text-xs text-white/70 min-w-0">
+                  <svg className="w-3.5 h-3.5 opacity-60 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                  <span className="truncate flex-1">{booking.customerPhone || '-'}</span>
+                </p>
+                <p className="flex items-start text-xs text-white/70 min-w-0">
+                  <svg className="w-3.5 h-3.5 opacity-60 mr-2 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                  <span className="flex-1 leading-snug truncate">{booking.requireDelivery ? `Diantar: ${booking.deliveryAddress || booking.address || '-'}` : 'Ambil di Toko (Mandiri)'}</span>
+                </p>
+              </div>
+            </div>             </div>
               </div>
 
               {booking.needAction ? (
