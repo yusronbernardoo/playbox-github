@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { useFirebase } from '@/context/FirebaseContext';
-import { formatSmartCountdown } from '@/lib/format';
+import { formatSmartCountdown, formatSmartDuration } from '@/lib/format';
 
 export default function BookingList() {
   const { bookings } = useFirebase();
@@ -217,7 +217,7 @@ export default function BookingList() {
                 <p className="flex items-center text-white/90 font-bold min-w-0 flex-1 truncate">
                   <span className="w-2 h-2 rounded-full bg-playbox-accent mr-2 shrink-0"></span> <span className="truncate">{booking.unit}</span>
                 </p>
-                <p className="text-xs font-medium text-white/50 shrink-0">{durHours} Jam</p>
+                <p className="text-xs font-medium text-white/50 shrink-0">{formatSmartDuration(durHours)}</p>
               </div>
 
               <div className="bg-black/40 p-3 rounded-2xl border border-white/5 shadow-inner">
