@@ -193,10 +193,10 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
       localBookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           let bDate: Date | null = null;
-          if (b.createdAt) {
-            bDate = new Date(b.createdAt);
-          } else if (b.isoStart || b.startTime) {
+          if (b.isoStart || b.startTime) {
             bDate = new Date(b.isoStart || b.startTime);
+          } else if (b.createdAt) {
+            bDate = new Date(b.createdAt);
           } else if (b.time) {
             const parts = b.time.split(', ');
             if (parts.length >= 1) {
@@ -262,10 +262,10 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     activeLocalBookings.forEach((b: any) => {
       if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
         let bDate: Date | null = null;
-        if (b.createdAt) {
-          bDate = new Date(b.createdAt);
-        } else if (b.isoStart || b.startTime) {
+        if (b.isoStart || b.startTime) {
           bDate = new Date(b.isoStart || b.startTime);
+        } else if (b.createdAt) {
+          bDate = new Date(b.createdAt);
         } else if (b.time) {
           const parts = b.time.split(', ');
           if (parts.length >= 1) bDate = new Date(parts[0]);
