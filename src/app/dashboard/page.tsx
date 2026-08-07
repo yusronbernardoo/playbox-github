@@ -6,11 +6,18 @@ import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { useFirebase } from '@/context/FirebaseContext';
 
 export default function DashboardHome() {
-  const { bookings } = useFirebase();
+  const { bookings, shopInfo } = useFirebase();
   const [greeting, setGreeting] = useState("Halo");
   const [businessName, setBusinessName] = useState("PlayBox Malang");
   const [shopLogo, setShopLogo] = useState<string>("");
   const tier = "PRO";
+
+  useEffect(() => {
+    if (shopInfo) {
+      if (shopInfo.brandName) setBusinessName(shopInfo.brandName);
+      if (shopInfo.logo !== undefined) setShopLogo(shopInfo.logo);
+    }
+  }, [shopInfo]);
 
   const [stats, setStats] = useState({
     totalUnit: 0,
@@ -34,23 +41,7 @@ export default function DashboardHome() {
     else if (hour < 18) setGreeting("Selamat Sore");
     else setGreeting("Selamat Malam");
 
-    // 1. Real-time Shop Profile Listener
-    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
-      if (snap.exists()) {
-        const d = snap.data();
-        if (d.brandName !== undefined) setBusinessName(d.brandName);
-        if (d.logo !== undefined) setShopLogo(d.logo);
-      } else {
-        const local = localStorage.getItem('playbox_shop_settings');
-        if (local) {
-          try {
-            const parsed = JSON.parse(local);
-            if (parsed.brandName !== undefined) setBusinessName(parsed.brandName);
-            if (parsed.logo !== undefined) setShopLogo(parsed.logo);
-          } catch {}
-        }
-      }
-    });
+
 
     // 2. Real-time Units Listener
     const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
@@ -67,7 +58,6 @@ export default function DashboardHome() {
     // 3. Real-time Bookings is now handled by FirebaseContext
 
     return () => {
-      unsubscribeShop();
       unsubscribeUnits();
     };
   }, []);

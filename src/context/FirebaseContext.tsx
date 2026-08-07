@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 
 interface Booking {
   id: string;
@@ -11,6 +11,7 @@ interface Booking {
 
 interface FirebaseContextType {
   bookings: Booking[];
+  shopInfo: any;
   newBookingToast: Booking | null;
   clearToast: () => void;
   isLoading: boolean;
@@ -18,6 +19,7 @@ interface FirebaseContextType {
 
 const FirebaseContext = createContext<FirebaseContextType>({
   bookings: [],
+  shopInfo: null,
   newBookingToast: null,
   clearToast: () => {},
   isLoading: true,
@@ -27,12 +29,13 @@ export const useFirebase = () => useContext(FirebaseContext);
 
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [shopInfo, setShopInfo] = useState<any>(null);
   const [newBookingToast, setNewBookingToast] = useState<Booking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadRef = useRef(true);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
       setIsLoading(false);
       
       const cloudBookings: Booking[] = [];
@@ -73,13 +76,27 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setShopInfo(data);
+        localStorage.setItem('playbox_shop_settings', JSON.stringify(data));
+      } else {
+        const saved = localStorage.getItem('playbox_shop_settings');
+        if (saved) setShopInfo(JSON.parse(saved));
+      }
+    });
+
+    return () => {
+      unsubscribeBookings();
+      unsubscribeShop();
+    };
   }, []);
 
   const clearToast = () => setNewBookingToast(null);
 
   return (
-    <FirebaseContext.Provider value={{ bookings, newBookingToast, clearToast, isLoading }}>
+    <FirebaseContext.Provider value={{ bookings, shopInfo, newBookingToast, clearToast, isLoading }}>
       {children}
     </FirebaseContext.Provider>
   );

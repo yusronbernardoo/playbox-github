@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useFirebase } from '@/context/FirebaseContext';
 
 export default function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = use(params);
@@ -19,29 +20,12 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const [manualDamageFee, setManualDamageFee] = useState('');
   const [damageDesc, setDamageDesc] = useState('');
 
-  // Rules & Shop Info
+  // Rules & Shop Info (from context)
+  const { shopInfo } = useFirebase();
   const [dendaRules, setDendaRules] = useState({ tolerance: 15, hourlyRate: 20000 });
-  const [shopInfo, setShopInfo] = useState({
-    brandName: 'PlayBox Rental',
-    phone: '081234567890',
-    address: 'Jl. Soekarno Hatta No. 12, Malang'
-  });
 
   useEffect(() => {
     const loadBookingData = async () => {
-      // Load Shop Info from Firestore or localStorage
-      try {
-        const shopSnap = await getDoc(doc(db, 'settings', 'shop'));
-        if (shopSnap.exists()) {
-          setShopInfo(shopSnap.data() as any);
-        } else {
-          const savedShop = localStorage.getItem('playbox_shop_settings');
-          if (savedShop) setShopInfo(JSON.parse(savedShop));
-        }
-      } catch (e) {
-        const savedShop = localStorage.getItem('playbox_shop_settings');
-        if (savedShop) setShopInfo(JSON.parse(savedShop));
-      }
 
       // Load Rules
       let rules = { tolerance: 15, hourlyRate: 20000 };
@@ -230,7 +214,10 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       <div id="invoice-capture" className="relative z-10 space-y-5 bg-playbox-bg rounded-2xl p-2 -mx-2">
         
         {/* Kop Struk (khusus untuk di gambar) */}
-        <div className="text-center mb-6 pt-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col items-center justify-center text-center mb-6 pt-4 border-b border-white/10 pb-4">
+          {shopInfo?.logo && (
+            <img src={shopInfo.logo} alt="Shop Logo" className="w-16 h-16 rounded-xl object-cover mb-3" />
+          )}
           <h2 className="text-xl font-black text-white tracking-tighter uppercase">{shopInfo?.brandName || 'PLAYBOX RENTAL'}</h2>
           <p className="text-xs text-white/70 mt-0.5">{shopInfo?.address || 'Struk Penyewaan Resmi'}</p>
           <p className="text-[11px] text-white/50">WA CS: {shopInfo?.phone || '-'}</p>
