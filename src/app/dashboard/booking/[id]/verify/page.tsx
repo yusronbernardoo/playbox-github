@@ -3,6 +3,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { formatSmartCountdown, formatSmartDuration } from '@/lib/format';
 
 export default function VerifyBooking({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
   const [calculatedOngkir, setCalculatedOngkir] = useState<number>(0);
   const [deliveryRules, setDeliveryRules] = useState<any[]>([]);
   const [timeLeft, setTimeLeft] = useState<string>('');
+  const [timeLabel, setTimeLabel] = useState<string>('Sisa Waktu');
   const [businessName, setBusinessName] = useState('PLAYBOX');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   
@@ -122,17 +124,24 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
     if (endStr) {
       const calculateTimeLeft = () => {
         const end = new Date(endStr).getTime();
+        const startMs = booking?.isoStart ? new Date(booking.isoStart).getTime() : 
+                       (booking?.startTime ? new Date(`${booking.startDate || ''} ${booking.startTime}`).getTime() : 0);
         const now = new Date().getTime();
-        const diff = end - now;
-
-        if (diff <= 0) {
-          setTimeLeft('Waktu Habis');
-          return;
+        
+        if (startMs && now < startMs) {
+          const diffToStart = startMs - now;
+          setTimeLabel('Mulai Dalam');
+          setTimeLeft(formatSmartCountdown(diffToStart).replace('J ', ' Jam ').replace('M', ' Menit'));
+        } else {
+          const diff = end - now;
+          if (diff <= 0) {
+            setTimeLabel('Sisa Waktu');
+            setTimeLeft('Waktu Habis');
+            return;
+          }
+          setTimeLabel('Sisa Waktu');
+          setTimeLeft(formatSmartCountdown(diff).replace('J ', ' Jam ').replace('M', ' Menit'));
         }
-
-        const h = Math.floor(diff / (1000 * 60 * 60));
-        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        setTimeLeft(`${h} Jam ${m} Menit`);
       };
 
       calculateTimeLeft();
@@ -329,7 +338,7 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
             <span className="w-6 text-playbox-text-secondary">🕒</span>
             <div>
               <p className="text-sm font-semibold text-white">
-                {displayDate} <span className="text-playbox-accent ml-1 font-bold">({displayDuration === 168 ? '1 Minggu' : displayDuration >= 24 ? `${displayDuration/24} Hari` : `${displayDuration} Jam`})</span>
+                {displayDate} <span className="text-playbox-accent ml-1 font-bold">({formatSmartDuration(Number(displayDuration))})</span>
               </p>
             </div>
           </div>
@@ -360,12 +369,12 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
                 <span className="text-xs font-bold text-playbox-ready uppercase tracking-wider">Status Waktu</span>
                 <span className="text-sm font-black text-playbox-ready">SELESAI ✔️</span>
               </div>
-            ) : (
-              <div className="flex justify-between items-center px-4 py-3 bg-white/5 border border-white/10 rounded-2xl">
-                <span className="text-xs font-medium text-playbox-text-secondary uppercase tracking-wider">Sisa Waktu</span>
-                <span className="text-sm font-black text-white animate-pulse">{timeLeft || 'Menghitung...'}</span>
-              </div>
-            )}
+              ) : (
+                <div className="flex justify-between items-center px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl">
+                  <span className="text-xs font-bold text-yellow-500/90 uppercase tracking-wider">{timeLabel}</span>
+                  <span className="text-sm font-black text-yellow-500 animate-pulse drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">{timeLeft || 'Menghitung...'}</span>
+                </div>
+              )}
           </div>
         )}
       </div>

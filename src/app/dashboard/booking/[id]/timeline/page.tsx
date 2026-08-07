@@ -4,7 +4,7 @@ import { toPng } from 'html-to-image';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
-import { formatSmartCountdown } from '@/lib/format';
+import { formatSmartCountdown, formatSmartDuration } from '@/lib/format';
 
 export default function TimelineBooking() {
   const { id } = useParams();
@@ -12,6 +12,7 @@ export default function TimelineBooking() {
 
   const [bookingData, setBookingData] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<string>('');
+  const [timeLabel, setTimeLabel] = useState<string>('Sisa Waktu');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   const [stages, setStages] = useState<string[]>([]);
@@ -135,15 +136,24 @@ export default function TimelineBooking() {
     if (endStr) {
       const calculateTimeLeft = () => {
         const end = new Date(endStr).getTime();
+        const startMs = bookingData?.isoStart ? new Date(bookingData.isoStart).getTime() : 
+                       (bookingData?.startTime ? new Date(`${bookingData.startDate || ''} ${bookingData.startTime}`).getTime() : 0);
         const now = new Date().getTime();
-        const diff = end - now;
-
-        if (diff <= 0) {
-          setTimeLeft('Waktu Habis');
-          return;
+        
+        if (startMs && now < startMs) {
+          const diffToStart = startMs - now;
+          setTimeLabel('Mulai Dalam');
+          setTimeLeft(formatSmartCountdown(diffToStart).replace('J ', ' Jam ').replace('M', ' Menit'));
+        } else {
+          const diff = end - now;
+          if (diff <= 0) {
+            setTimeLabel('Sisa Waktu');
+            setTimeLeft('Waktu Habis');
+            return;
+          }
+          setTimeLabel('Sisa Waktu');
+          setTimeLeft(formatSmartCountdown(diff).replace('J ', ' Jam ').replace('M', ' Menit'));
         }
-
-        setTimeLeft(formatSmartCountdown(diff).replace('J ', ' Jam ').replace('M', ' Menit'));
       };
 
       calculateTimeLeft();
@@ -328,7 +338,7 @@ export default function TimelineBooking() {
                 </div>
               ) : (
                 <div className="flex justify-between items-center px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl shadow-[0_0_15px_rgba(234,179,8,0.15)]">
-                  <span className="text-xs font-bold text-yellow-500/90 uppercase tracking-wider">Sisa Waktu</span>
+                  <span className="text-xs font-bold text-yellow-500/90 uppercase tracking-wider">{timeLabel}</span>
                   <span className="text-sm font-black text-yellow-500 animate-pulse drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">{timeLeft || 'Menghitung...'}</span>
                 </div>
               )}
@@ -585,7 +595,7 @@ export default function TimelineBooking() {
               <p className="text-lg font-bold text-white">
                 {bookingData?.startTime ? new Date(bookingData.startTime).toLocaleDateString('id-ID') : bookingData?.startDate}
               </p>
-              <p className="text-white/60 text-lg mt-1">{bookingData?.durationHours || 24} Jam</p>
+              <p className="text-white/60 text-lg mt-1">{formatSmartDuration(Number(bookingData?.durationHours || bookingData?.duration || 24))}</p>
             </div>
           </div>
 
