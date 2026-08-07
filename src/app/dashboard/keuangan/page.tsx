@@ -82,7 +82,7 @@ export default function Keuangan() {
         });
         cloudExpenses.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         localStorage.setItem('playbox_expenses', JSON.stringify(cloudExpenses));
-        setData(prev => ({ ...prev, pengeluaranItems: cloudExpenses }));
+        loadFinancialData();
       }
     }, (err) => console.warn('Expenses listener fallback:', err));
 
@@ -243,14 +243,7 @@ export default function Keuangan() {
       console.error('Failed adding expense to Firestore:', err);
     }
 
-    // 2. Local State
-    const updated = [item, ...data.pengeluaranItems];
-    setData({
-      ...data,
-      pengeluaranItems: updated
-    });
-    localStorage.setItem('playbox_expenses', JSON.stringify(updated));
-
+    // Local State is automatically handled by the onSnapshot real-time listener
     setNewExpense({ category: 'Bensin', amount: '', desc: '' });
     setShowModal(false);
   };
@@ -268,14 +261,7 @@ export default function Keuangan() {
         console.error('Failed deleting expense from Firestore:', err);
       }
 
-      // 2. Delete from LocalStorage & State
-      const updated = data.pengeluaranItems.filter(item => item.id !== expenseToDelete.id);
-      setData({
-        ...data,
-        pengeluaranItems: updated
-      });
-      localStorage.setItem('playbox_expenses', JSON.stringify(updated));
-
+      // Local State is automatically handled by the onSnapshot real-time listener
       setIsDeleting(false);
       setExpenseToDelete(null);
     } catch (error) {
