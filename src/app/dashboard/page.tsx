@@ -5,6 +5,27 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { useFirebase } from '@/context/FirebaseContext';
 
+const generateSmoothPath = (data: number[], max: number) => {
+  if (!data || data.length === 0) return '';
+  const points = data.map((val, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const y = 100 - (Math.max((val / (max || 1)) * 100, 5));
+    return { x, y };
+  });
+
+  let path = `M ${points[0].x},${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const cp1x = p0.x + (p1.x - p0.x) / 2.5;
+    const cp1y = p0.y;
+    const cp2x = p1.x - (p1.x - p0.x) / 2.5;
+    const cp2y = p1.y;
+    path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p1.x},${p1.y}`;
+  }
+  return path;
+};
+
 export default function DashboardHome() {
   const { bookings, shopInfo } = useFirebase();
   const [greeting, setGreeting] = useState("Halo");
@@ -337,30 +358,31 @@ export default function DashboardHome() {
             </Link>
           </div>
           
-          {/* 7-Day SVG Area Chart */}
-          <div className="mt-5 pt-4 border-t border-white/5 relative h-32 w-full mb-2">
+          {/* 7-Day Smooth SVG Area Chart */}
+          <div className="mt-8 pt-4 relative h-40 w-full mb-6">
             <svg className="w-full h-full overflow-visible absolute inset-0" preserveAspectRatio="none" viewBox="0 0 100 100">
               <defs>
                 <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#bef264" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#bef264" stopOpacity="0" />
                 </linearGradient>
               </defs>
               {/* Area Fill */}
-              <polygon 
-                points={`0,100 ${chartData.data.map((val, i) => `${(i / (chartData.data.length - 1)) * 100},${100 - (Math.max((val / chartData.max) * 100, 5))}`).join(' ')} 100,100`} 
+              <path 
+                d={`${generateSmoothPath(chartData.data, chartData.max)} L 100,100 L 0,100 Z`} 
                 fill="url(#chartGradient)" 
                 className="animate-in fade-in duration-1000"
               />
               {/* Line Path */}
-              <polyline 
-                points={chartData.data.map((val, i) => `${(i / (chartData.data.length - 1)) * 100},${100 - (Math.max((val / chartData.max) * 100, 5))}`).join(' ')}
+              <path 
+                d={generateSmoothPath(chartData.data, chartData.max)}
                 fill="none" 
-                stroke="#3b82f6" 
-                strokeWidth="2"
+                stroke="#d9f99d" 
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="animate-in fade-in duration-1000"
+                className="animate-in fade-in duration-1000 shadow-[0_0_15px_rgba(190,242,100,0.8)]"
+                style={{ filter: 'drop-shadow(0px 0px 4px rgba(217,249,157,0.8))' }}
               />
             </svg>
 
@@ -370,23 +392,31 @@ export default function DashboardHome() {
                 const isToday = i === chartData.data.length - 1;
                 const heightPercent = Math.max((val / (chartData.max || 1)) * 100, 5);
                 const leftPercent = (i / (chartData.data.length - 1)) * 100;
+                // Only show dots and lines for non-zero values or just keep them minimal
+                if (val === 0 && !isToday && chartData.max > 0) return null; // hide zero dots for cleaner look unless it's today
+
                 return (
                   <div 
                     key={i} 
-                    className="absolute top-0 bottom-0 w-8 -ml-4 flex flex-col items-center justify-end group cursor-pointer z-10"
+                    className="absolute top-0 bottom-0 w-8 -ml-4 flex flex-col items-center justify-end z-10"
                     style={{ left: `${leftPercent}%` }}
                   >
-                    {/* Tooltip */}
+                    {/* Value Text */}
                     <div 
-                      className="absolute bg-white text-black text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none" 
+                      className={`absolute font-bold whitespace-nowrap drop-shadow-md ${isToday ? 'text-white text-[11px]' : 'text-white/70 text-[9px]'}`}
                       style={{ bottom: `calc(${heightPercent}% + 8px)` }}
                     >
-                      Rp {val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
+                      {val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
                     </div>
                     {/* Dot */}
                     <div 
-                      className={`rounded-full transition-all shadow-[0_0_10px_rgba(59,130,246,0.5)] ${isToday ? 'w-2 h-2 bg-white ring-2 ring-blue-500' : 'w-1.5 h-1.5 bg-blue-500 group-hover:w-2 group-hover:h-2 group-hover:bg-white group-hover:ring-2 group-hover:ring-blue-500'}`}
-                      style={{ marginBottom: `calc(${heightPercent}% - ${isToday ? '4px' : '3px'})` }}
+                      className={`rounded-full bg-white z-20 shadow-[0_0_10px_rgba(255,255,255,1)] ${isToday ? 'w-2.5 h-2.5 ring-4 ring-[#bef264]/40' : 'w-1.5 h-1.5'}`}
+                      style={{ marginBottom: `calc(${heightPercent}% - ${isToday ? '5px' : '3px'})` }}
+                    ></div>
+                    {/* Vertical Dashed Line */}
+                    <div 
+                      className="absolute bottom-0 w-px border-l border-dashed border-white/20"
+                      style={{ height: `calc(${heightPercent}% - 5px)` }}
                     ></div>
                   </div>
                 );
@@ -394,7 +424,7 @@ export default function DashboardHome() {
             </div>
 
             {/* Labels */}
-            <div className="absolute -bottom-4 left-0 right-0 pointer-events-none">
+            <div className="absolute -bottom-6 left-0 right-0 pointer-events-none">
               {chartData.labels.map((lbl, idx) => {
                 const leftPercent = (idx / (chartData.labels.length - 1)) * 100;
                 return (
