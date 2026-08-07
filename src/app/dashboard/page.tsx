@@ -29,11 +29,12 @@ export default function DashboardHome() {
 
   const [tasks, setTasks] = useState<any[]>([]);
   const [revenue, setRevenue] = useState(0);
-  const [chartData, setChartData] = useState<{data: number[], labels: string[], max: number}>({data: [], labels: [], max: 1});
+  const [chartData, setChartData] = useState({ data: [0,0,0,0,0,0,0], labels: ['','','','','','',''], max: 1 });
   const [topUnits, setTopUnits] = useState<any[]>([]);
-  const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     // Dynamic greeting based on time
     const hour = new Date().getHours();
     if (hour < 11) setGreeting("Selamat Pagi");
@@ -247,7 +248,7 @@ export default function DashboardHome() {
   }
 
   const summary = [
-    { title: "Unit Disewa", count: stats.unitDisewa, color: "text-playbox-disewa", borderColor: "border-pink-500/20 hover:border-pink-500/40", icon: "💼", href: "/dashboard/unit?filter=Disewa" },
+    { title: "Unit Disewa", count: stats.unitDisewa, color: "text-purple-400", borderColor: "border-purple-500/20 hover:border-purple-500/40", icon: "💼", href: "/dashboard/unit?filter=Disewa" },
     { title: "Unit Ready", count: stats.unitReady, color: "text-playbox-ready", borderColor: "border-emerald-500/20 hover:border-emerald-500/40", icon: "🎮", href: "/dashboard/unit?filter=Ready" },
     { title: "Maintenance", count: stats.unitMaintenance, color: "text-red-500", borderColor: "border-red-500/20 hover:border-red-500/40", icon: "🔧", href: "/dashboard/unit?filter=Maintenance" },
     { title: "Verifikasi", count: stats.bookingBaru, color: "text-yellow-500", borderColor: "border-amber-500/20 hover:border-amber-500/40", icon: "⏳", href: "/dashboard/booking?filter=Perlu Verifikasi" }
@@ -335,30 +336,68 @@ export default function DashboardHome() {
             </Link>
           </div>
           
-          {/* 7-Day Bar Chart */}
-          <div className="mt-5 pt-4 border-t border-white/5">
-            <div className="flex items-end justify-between h-20 gap-2">
-              {chartData.data.map((val, idx) => {
-                const heightPercent = val === 0 ? 0 : Math.max(8, Math.round((val / chartData.max) * 100));
-                const isToday = idx === 6;
+          {/* 7-Day SVG Area Chart */}
+          <div className="mt-5 pt-4 border-t border-white/5 relative h-32 w-full mb-2">
+            <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {/* Area Fill */}
+              <polygon 
+                points={`0,100 ${chartData.data.map((val, i) => `${(i / (chartData.data.length - 1)) * 100},${100 - (Math.max((val / chartData.max) * 100, 5))}`).join(' ')} 100,100`} 
+                fill="url(#chartGradient)" 
+                className="animate-in fade-in duration-1000"
+              />
+              {/* Line Path */}
+              <polyline 
+                points={chartData.data.map((val, i) => `${(i / (chartData.data.length - 1)) * 100},${100 - (Math.max((val / chartData.max) * 100, 5))}`).join(' ')}
+                fill="none" 
+                stroke="#3b82f6" 
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="animate-in fade-in duration-1000"
+              />
+              {/* Data Points */}
+              {chartData.data.map((val, i) => {
+                const isToday = i === chartData.data.length - 1;
+                const x = (i / (chartData.data.length - 1)) * 100;
+                const y = 100 - (Math.max((val / chartData.max) * 100, 5));
                 return (
-                  <div key={idx} className="flex flex-col justify-end items-center flex-1 group relative h-full">
-                    <div className="absolute -top-7 bg-white text-black text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg z-20">
-                      Rp {(val / 1000).toFixed(0)}k
-                    </div>
-                    <div className="w-full bg-white/5 rounded-t-sm flex items-end justify-center rounded-b-sm overflow-hidden flex-1 mb-1.5">
-                      <div 
-                        className={`w-full rounded-t-sm rounded-b-sm transition-all duration-700 ease-out ${isToday ? 'bg-gradient-to-t from-playbox-gradient-start to-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.5)]' : 'bg-white/30 group-hover:bg-white/50'}`} 
-                        style={{ height: `${heightPercent}%` }}
-                      ></div>
-                    </div>
-                    <span className={`text-[9px] font-semibold ${isToday ? 'text-white' : 'text-white/40'}`}>{chartData.labels[idx]}</span>
-                  </div>
+                  <g key={i} className="group cursor-pointer">
+                    <circle 
+                      cx={x} 
+                      cy={y} 
+                      r={isToday ? "3.5" : "2.5"} 
+                      fill={isToday ? "#fff" : "#3b82f6"} 
+                      stroke={isToday ? "#3b82f6" : "none"}
+                      strokeWidth={isToday ? "1.5" : "0"}
+                      className="animate-in zoom-in duration-700 delay-300 transition-all group-hover:r-4"
+                    />
+                    <text 
+                      x={x} 
+                      y={y - 8} 
+                      textAnchor="middle" 
+                      fill="white" 
+                      fontSize="6" 
+                      fontWeight="bold" 
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
+                    </text>
+                  </g>
                 );
               })}
+            </svg>
+            <div className="absolute -bottom-4 left-0 right-0 flex justify-between px-1">
+              {chartData.labels.map((lbl, idx) => (
+                <span key={idx} className={`text-[9px] font-semibold ${idx === 6 ? 'text-white' : 'text-white/40'}`}>{lbl}</span>
+              ))}
             </div>
           </div>
-        </div>
       </section>
 
       {/* Perlu Dikerjakan (Overdue Fines Alert & Urgent Tasks) */}
@@ -433,8 +472,8 @@ export default function DashboardHome() {
                 </div>
                 <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-playbox-gradient-start to-playbox-accent rounded-full transition-all duration-700"
-                    style={{ width: `${percentage}%` }}
+                    className="h-full bg-gradient-to-r from-playbox-gradient-start to-playbox-accent rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${isMounted ? percentage : 0}%` }}
                   ></div>
                 </div>
               </div>
