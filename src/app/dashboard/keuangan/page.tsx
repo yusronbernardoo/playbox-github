@@ -206,6 +206,9 @@ export default function Keuangan() {
       }
     }
 
+    // Filter expenses by period
+    const filteredExpenses = savedExpenses.filter((exp: any) => filterBookingPeriod(exp, false));
+
     setData({
       pendapatan: totalPendapatan,
       rental: totalRental,
@@ -213,7 +216,7 @@ export default function Keuangan() {
       denda: totalDenda,
       pendapatanTren: tren,
       trenLabel: trenLabel,
-      pengeluaranItems: savedExpenses
+      pengeluaranItems: filteredExpenses
     });
   };
 
