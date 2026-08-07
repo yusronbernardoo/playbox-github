@@ -339,7 +339,7 @@ export default function DashboardHome() {
           
           {/* 7-Day SVG Area Chart */}
           <div className="mt-5 pt-4 border-t border-white/5 relative h-32 w-full mb-2">
-            <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+            <svg className="w-full h-full overflow-visible absolute inset-0" preserveAspectRatio="none" viewBox="0 0 100 100">
               <defs>
                 <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
@@ -357,46 +357,56 @@ export default function DashboardHome() {
                 points={chartData.data.map((val, i) => `${(i / (chartData.data.length - 1)) * 100},${100 - (Math.max((val / chartData.max) * 100, 5))}`).join(' ')}
                 fill="none" 
                 stroke="#3b82f6" 
-                strokeWidth="2.5"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="animate-in fade-in duration-1000"
               />
-              {/* Data Points */}
+            </svg>
+
+            {/* HTML Overlay for Data Points & Interaction */}
+            <div className="absolute inset-0">
               {chartData.data.map((val, i) => {
                 const isToday = i === chartData.data.length - 1;
-                const x = (i / (chartData.data.length - 1)) * 100;
-                const y = 100 - (Math.max((val / chartData.max) * 100, 5));
+                const heightPercent = Math.max((val / (chartData.max || 1)) * 100, 5);
+                const leftPercent = (i / (chartData.data.length - 1)) * 100;
                 return (
-                  <g key={i} className="group cursor-pointer">
-                    <circle 
-                      cx={x} 
-                      cy={y} 
-                      r={isToday ? "3.5" : "2.5"} 
-                      fill={isToday ? "#fff" : "#3b82f6"} 
-                      stroke={isToday ? "#3b82f6" : "none"}
-                      strokeWidth={isToday ? "1.5" : "0"}
-                      className="animate-in zoom-in duration-700 delay-300 transition-all group-hover:r-4"
-                    />
-                    <text 
-                      x={x} 
-                      y={y - 8} 
-                      textAnchor="middle" 
-                      fill="white" 
-                      fontSize="6" 
-                      fontWeight="bold" 
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  <div 
+                    key={i} 
+                    className="absolute top-0 bottom-0 w-8 -ml-4 flex flex-col items-center justify-end group cursor-pointer z-10"
+                    style={{ left: `${leftPercent}%` }}
+                  >
+                    {/* Tooltip */}
+                    <div 
+                      className="absolute bg-white text-black text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none" 
+                      style={{ bottom: `calc(${heightPercent}% + 8px)` }}
                     >
-                      {val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
-                    </text>
-                  </g>
+                      Rp {val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
+                    </div>
+                    {/* Dot */}
+                    <div 
+                      className={`rounded-full transition-all shadow-[0_0_10px_rgba(59,130,246,0.5)] ${isToday ? 'w-2 h-2 bg-white ring-2 ring-blue-500' : 'w-1.5 h-1.5 bg-blue-500 group-hover:w-2 group-hover:h-2 group-hover:bg-white group-hover:ring-2 group-hover:ring-blue-500'}`}
+                      style={{ marginBottom: `calc(${heightPercent}% - ${isToday ? '4px' : '3px'})` }}
+                    ></div>
+                  </div>
                 );
               })}
-            </svg>
-            <div className="absolute -bottom-4 left-0 right-0 flex justify-between px-1">
-              {chartData.labels.map((lbl, idx) => (
-                <span key={idx} className={`text-[9px] font-semibold ${idx === 6 ? 'text-white' : 'text-white/40'}`}>{lbl}</span>
-              ))}
+            </div>
+
+            {/* Labels */}
+            <div className="absolute -bottom-4 left-0 right-0 pointer-events-none">
+              {chartData.labels.map((lbl, idx) => {
+                const leftPercent = (idx / (chartData.labels.length - 1)) * 100;
+                return (
+                  <span 
+                    key={idx} 
+                    className={`absolute text-[9px] font-semibold text-center w-6 -ml-3 ${idx === 6 ? 'text-white' : 'text-white/40'}`}
+                    style={{ left: `${leftPercent}%` }}
+                  >
+                    {lbl}
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>
