@@ -35,6 +35,7 @@ export default function Keuangan() {
     delivery: number;
     denda: number;
     pengeluaranItems: any[];
+    pendapatanItems: any[];
   }>({
     pendapatan: 0,
     pendapatanTren: 0,
@@ -42,7 +43,8 @@ export default function Keuangan() {
     rental: 0,
     delivery: 0,
     denda: 0,
-    pengeluaranItems: []
+    pengeluaranItems: [],
+    pendapatanItems: []
   });
   const [isAuth, setIsAuth] = useState(false);
 
@@ -99,6 +101,7 @@ export default function Keuangan() {
     let totalRental = 0;
     let totalDelivery = 0;
     let totalDenda = 0;
+    const currentBookings: any[] = [];
 
     const filterBookingPeriod = (b: any, isPrevious: boolean = false) => {
       let bDate: Date | null = null;
@@ -169,6 +172,7 @@ export default function Keuangan() {
             totalDelivery += tDelivery;
             totalRental += (tPrice - tDelivery - tDenda);
             totalDenda += tDenda;
+            currentBookings.push(b);
           }
           if (filterBookingPeriod(b, true)) {
             prevPendapatan += Number(b.totalPrice) || 0;
@@ -216,7 +220,8 @@ export default function Keuangan() {
       denda: totalDenda,
       pendapatanTren: tren,
       trenLabel: trenLabel,
-      pengeluaranItems: filteredExpenses
+      pengeluaranItems: filteredExpenses,
+      pendapatanItems: currentBookings
     });
   };
 
@@ -249,40 +254,115 @@ export default function Keuangan() {
   };
 
   const handleExportExcel = () => {
-    const csvRows = [];
-    csvRows.push(['LAPORAN KEUANGAN']);
-    csvRows.push(['Periode:', period === 'Pilih Tanggal...' && selectedDate ? selectedDate.toLocaleDateString('id-ID') : period]);
-    csvRows.push([]);
-    csvRows.push(['RINGKASAN PENDAPATAN']);
-    csvRows.push(['Sewa Unit', data.rental]);
-    csvRows.push(['Biaya Delivery', data.delivery]);
-    csvRows.push(['Denda', data.denda]);
-    csvRows.push(['Total Pendapatan', data.pendapatan]);
-    csvRows.push([]);
-    csvRows.push(['RINCIAN PENGELUARAN']);
-    
-    let totalPengeluaran = 0;
-    if (data.pengeluaranItems.length > 0) {
-      csvRows.push(['Tanggal', 'Kategori', 'Nominal', 'Deskripsi']);
-      data.pengeluaranItems.forEach(exp => {
-        const dateStr = new Date(exp.createdAt).toLocaleString('id-ID').replace(',', '');
-        csvRows.push([dateStr, exp.category, exp.amount, `"${(exp.desc || '-').replace(/"/g, '""')}"`]);
-        totalPengeluaran += (Number(exp.amount) || 0);
+    const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'medium' });
+    const periodStr = period === 'Pilih Tanggal...' && selectedDate ? selectedDate.toLocaleDateString('id-ID', { dateStyle: 'full' }) : period;
+
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <style>
+          table { border-collapse: collapse; font-family: Arial, sans-serif; }
+          th { background-color: #107C41; color: white; font-weight: bold; border: 1px solid #ddd; padding: 10px; text-align: left; }
+          td { border: 1px solid #ddd; padding: 8px; vertical-align: middle; }
+          .header { font-size: 20px; font-weight: bold; color: #107C41; }
+          .subheader { font-size: 14px; color: #666; }
+          .section-title { font-size: 14px; font-weight: bold; background-color: #f3f4f6; color: #333; margin-top: 20px; }
+          .total { font-weight: bold; background-color: #e5e7eb; }
+          .profit { font-weight: bold; font-size: 16px; background-color: #d1fae5; color: #065f46; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td colspan="6" class="header">LAPORAN KEUANGAN PLAYBOX</td></tr>
+          <tr><td colspan="6" class="subheader">Periode: ${periodStr}</td></tr>
+          <tr><td colspan="6" class="subheader">Dicetak pada: ${nowStr}</td></tr>
+          <tr><td colspan="6"></td></tr>
+
+          <tr class="section-title"><td colspan="6">RINGKASAN KEUANGAN</td></tr>
+          <tr><td colspan="2">Sewa Unit</td><td colspan="4">Rp ${data.rental.toLocaleString('id-ID')}</td></tr>
+          <tr><td colspan="2">Biaya Delivery</td><td colspan="4">Rp ${data.delivery.toLocaleString('id-ID')}</td></tr>
+          <tr><td colspan="2">Denda</td><td colspan="4">Rp ${data.denda.toLocaleString('id-ID')}</td></tr>
+          <tr class="total"><td colspan="2">Total Pendapatan</td><td colspan="4">Rp ${data.pendapatan.toLocaleString('id-ID')}</td></tr>
+          <tr><td colspan="2">Total Pengeluaran</td><td colspan="4">Rp ${pengeluaranTotal.toLocaleString('id-ID')}</td></tr>
+          <tr class="profit"><td colspan="2">PROFIT BERSIH (Laba)</td><td colspan="4">Rp ${profit.toLocaleString('id-ID')}</td></tr>
+          
+          <tr><td colspan="6"></td></tr>
+
+          <tr class="section-title"><td colspan="6">RINCIAN PENDAPATAN (TRANSAKSI SELESAI/LUNAS)</td></tr>
+          <tr>
+            <th>No. Invoice</th>
+            <th>Pelanggan</th>
+            <th>Unit</th>
+            <th>Waktu Pemesanan</th>
+            <th>Ongkir/Delivery</th>
+            <th>Total Bayar</th>
+          </tr>
+    `;
+
+    if (data.pendapatanItems.length > 0) {
+      data.pendapatanItems.forEach(b => {
+        const d = new Date(b.createdAt || b.isoStart || Date.now()).toLocaleString('id-ID');
+        const deliveryFee = b.requireDelivery ? (Number(b.deliveryFee) || 0) : 0;
+        const total = Number(b.totalPrice) || 0;
+        html += `
+          <tr>
+            <td>${b.code || '-'}</td>
+            <td>${b.customer || '-'}</td>
+            <td>${b.unit || '-'}</td>
+            <td>${d}</td>
+            <td>Rp ${deliveryFee.toLocaleString('id-ID')}</td>
+            <td style="font-weight: bold;">Rp ${total.toLocaleString('id-ID')}</td>
+          </tr>
+        `;
       });
     } else {
-      csvRows.push(['Belum ada pengeluaran di periode ini']);
+      html += `<tr><td colspan="6">Belum ada transaksi pendapatan di periode ini</td></tr>`;
     }
-    csvRows.push(['Total Pengeluaran', totalPengeluaran]);
-    csvRows.push([]);
-    csvRows.push(['PROFIT BERSIH (Laba)', data.pendapatan - totalPengeluaran]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
-      
-    const encodedUri = encodeURI(csvContent);
+    html += `
+          <tr><td colspan="6"></td></tr>
+          <tr class="section-title"><td colspan="6">RINCIAN PENGELUARAN</td></tr>
+          <tr>
+            <th>Waktu Dibuat</th>
+            <th colspan="2">Kategori</th>
+            <th colspan="2">Deskripsi / Catatan</th>
+            <th>Nominal Pengeluaran</th>
+          </tr>
+    `;
+
+    if (data.pengeluaranItems.length > 0) {
+      data.pengeluaranItems.forEach(exp => {
+        const dateStr = new Date(exp.createdAt).toLocaleString('id-ID');
+        html += `
+          <tr>
+            <td>${dateStr}</td>
+            <td colspan="2">${exp.category}</td>
+            <td colspan="2">${exp.desc || '-'}</td>
+            <td style="color: #dc2626; font-weight: bold;">Rp ${(Number(exp.amount) || 0).toLocaleString('id-ID')}</td>
+          </tr>
+        `;
+      });
+    } else {
+      html += `<tr><td colspan="6">Belum ada pengeluaran di periode ini</td></tr>`;
+    }
+    
+    html += `
+          <tr class="total">
+            <td colspan="5" style="text-align: right;">Total Pengeluaran</td>
+            <td style="color: #dc2626; font-weight: bold;">Rp ${pengeluaranTotal.toLocaleString('id-ID')}</td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const encodedUri = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     const dateSuffix = period === 'Pilih Tanggal...' && selectedDate ? selectedDate.toLocaleDateString('id-ID').replace(/\//g, '-') : period.replace(/ /g, '_');
-    link.setAttribute("download", `Laporan_Keuangan_${dateSuffix}.csv`);
+    link.setAttribute("download", `Laporan_Keuangan_Playbox_${dateSuffix}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
