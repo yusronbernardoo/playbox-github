@@ -39,8 +39,6 @@ export default function CustomerDetails() {
       console.error('Error checking blacklist:', e);
     }
   };
-  const [ktpFile, setKtpFile] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
