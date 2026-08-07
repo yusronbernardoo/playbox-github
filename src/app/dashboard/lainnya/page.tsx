@@ -72,7 +72,7 @@ export default function LainnyaPage() {
         )}
         <div className="min-w-0 flex-1">
           <h2 className="font-bold text-lg truncate text-white">{role === 'owner' ? shopName : `Kasir: ${username}`}</h2>
-          <p className="text-sm text-playbox-text-secondary">{role === 'owner' ? 'SaaS PRO Tier' : 'Akses Terbatas'}</p>
+          <p className="text-sm text-playbox-text-secondary">{role === 'owner' ? 'Renterva Play' : 'Akses Terbatas'}</p>
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export default function LainnyaPage() {
                       <div className="w-8 h-8 rounded-full bg-playbox-accent/20 flex items-center justify-center">
                         <svg className="w-4 h-4 text-playbox-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                       </div>
-                      <span className="font-bold text-white">Profil & Link Toko (SaaS)</span>
+                      <span className="font-bold text-white">Profil & Outlet Bisnis</span>
                     </div>
                     <span className="text-playbox-accent text-sm font-bold">Set →</span>
                   </Link>
@@ -175,7 +175,7 @@ export default function LainnyaPage() {
         >
           Keluar (Logout)
         </button>
-        <p className="text-center text-[10px] text-white/30 font-medium mt-4 tracking-widest">PLAYBOX OS v1.0.0</p>
+        <p className="text-center text-[10px] text-white/30 font-medium mt-4 tracking-widest">RENTERVA PLAY v1.0.0</p>
       </div>
     </div>
   );
