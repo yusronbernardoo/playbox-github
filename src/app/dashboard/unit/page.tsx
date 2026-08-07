@@ -32,14 +32,19 @@ export default function UnitList() {
 
     const applyStatusUpdate = (rawUnits: any[]) => {
       return rawUnits.map(u => {
-        if (u.status === 'Maintenance') return u;
+        if (u.status === 'Maintenance') {
+          return {
+            ...u,
+            statusColor: 'bg-playbox-maintenance/10 text-playbox-maintenance border border-playbox-maintenance/20'
+          };
+        }
         const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
         return {
           ...u,
           status: isBusy ? 'Disewa' : (u.status || 'Ready'),
           statusColor: isBusy 
-            ? 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20' 
-            : 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20'
+            ? 'bg-playbox-disewa/10 text-playbox-disewa border border-playbox-disewa/20' 
+            : 'bg-playbox-ready/10 text-playbox-ready border border-playbox-ready/20'
         };
       });
     };

@@ -8,9 +8,9 @@
   --color-accent-hover: #3B82F6; /* Lighter Blue */
   --color-accent-gradient-start: #1E3A8A; /* Dark Blue */
   --color-accent-gradient-end: #2563EB; /* Vibrant Blue */
-  --color-status-ready: #23C552;
-  --color-status-disewa: #E2178E;
-  --color-status-maintenance: #F5A623;
+  --color-status-ready: #10B981; /* Emerald Green */
+  --color-status-disewa: #F59E0B; /* Amber/Orange */
+  --color-status-maintenance: #EF4444; /* Red */
   --color-profit-positive: #23C552;
   --color-text-primary: #FFFFFF;
   --color-text-secondary: #9BA1B0;
