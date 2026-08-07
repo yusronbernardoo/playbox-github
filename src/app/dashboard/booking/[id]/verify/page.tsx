@@ -243,27 +243,10 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
       await handleUpdateStatus('Sedang Dipakai', 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20', updateData);
       
       // 2. Update status unit di katalog (Firestore & localStorage)
-      try {
-        if (booking.unitId) {
-          await updateDoc(doc(db, 'units', booking.unitId), { status: 'Disewa' });
-        }
-      } catch (e) {
-        console.warn('Update unit status firestore fallback:', e);
-      }
+      // DIHAPUS: Kita tidak lagi memaksa status unit menjadi 'Disewa' di database.
+      // Ketersediaan unit sekarang dihitung otomatis secara dinamis (real-time calendar) di halaman katalog.
 
-      const savedUnits = localStorage.getItem('playbox_mock_units');
-      if (savedUnits) {
-        const units = JSON.parse(savedUnits);
-        const updatedUnits = units.map((u: any) => {
-          if (u.id === booking.unitId || u.name === booking.unit) {
-            return { ...u, status: 'Disewa' };
-          }
-          return u;
-        });
-        localStorage.setItem('playbox_mock_units', JSON.stringify(updatedUnits));
-      }
-
-      alert('Pesanan Lunas! Status diperbarui ke "Sedang Dipakai" dan unit ditandai Disewa.');
+      alert('Pesanan Lunas! Jadwal telah diamankan.');
       router.push('/dashboard/booking');
     }
   };
@@ -302,6 +285,14 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
   const displayAddress = booking.deliveryAddress || booking.address || '-';
   const displayDate = booking.date || booking.startDate || (booking.startTime ? new Date(booking.startTime).toLocaleDateString('id-ID') : booking.time || '-');
 
+  const startMs = booking?.isoStart ? new Date(booking.isoStart).getTime() : 
+                 (booking?.startTime ? new Date(`${booking.startDate || ''} ${booking.startTime}`).getTime() : 0);
+  
+  let displayStatus = booking?.status || '';
+  if (displayStatus === 'Sedang Dipakai' && startMs && new Date().getTime() < startMs) {
+    displayStatus = 'Menunggu Hari H';
+  }
+
   return (
     <div className="p-4 space-y-6 pb-36 relative">
       <div className="ambient-glow"></div>
@@ -321,8 +312,8 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-playbox-accent/10 rounded-full blur-3xl"></div>
         <div className="flex justify-between items-start mb-1">
           <h2 className="text-xs font-semibold text-playbox-text-secondary uppercase tracking-widest">Kode Invoice</h2>
-          <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${booking.statusColor}`}>
-            {booking.status}
+          <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${displayStatus === 'Menunggu Hari H' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : booking.statusColor}`}>
+            {displayStatus}
           </span>
         </div>
         <p className="font-bold text-2xl text-white tracking-tight">{booking.code}</p>

@@ -141,6 +141,15 @@ export default function BookingList() {
           const { formattedStart, formattedEnd, rawEnd } = getComputedDates(booking);
           const durHours = Number(booking.durationHours || booking.duration || 24);
 
+          const startMs = booking.isoStart ? new Date(booking.isoStart).getTime() : 
+                         (booking.startTime ? new Date(`${booking.startDate || ''} ${booking.startTime}`).getTime() : 0);
+
+          // Custom display label logic for future bookings
+          let displayStatus = booking.status;
+          if (booking.status === 'Sedang Dipakai' && startMs && now < startMs) {
+            displayStatus = 'Menunggu Hari H';
+          }
+
           // Timer calculation
           let timerBadge = null;
           if (rawEnd && booking.status !== 'Selesai' && booking.status !== 'Perlu Verifikasi') {
@@ -180,6 +189,7 @@ export default function BookingList() {
                const getBadgeStyle = (status: string) => {
         if (status === 'Selesai') return 'bg-playbox-ready/10 text-playbox-ready border border-playbox-ready/20';
         if (status === 'Sedang Dipakai' || status === 'Diantar') return 'bg-playbox-disewa/10 text-playbox-disewa border border-playbox-disewa/20';
+        if (status === 'Menunggu Hari H') return 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
         if (status === 'Dibatalkan') return 'bg-red-500/10 text-red-500 border border-red-500/20';
         if (status === 'Perlu Verifikasi' || status === 'Menunggu Pembayaran') return 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20';
         return 'bg-blue-500/10 text-blue-500 border border-blue-500/20'; // default/Persiapan
@@ -198,8 +208,8 @@ export default function BookingList() {
                 <h3 className="font-bold text-lg tracking-tight text-white/90 truncate" title={booking.customer}>{booking.customer}</h3>
               </div>
               <div className="text-right shrink-0">
-                <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block mb-1 ${getBadgeStyle(booking.status)}`}>
-                  {booking.status}
+                <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block mb-1 ${getBadgeStyle(displayStatus)}`}>
+                  {displayStatus}
                 </span>
                 <p className="text-sm font-black text-playbox-ready whitespace-nowrap">Rp {Number(booking.totalPrice || 0).toLocaleString('id-ID')}</p>
               </div>
