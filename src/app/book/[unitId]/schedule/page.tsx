@@ -69,6 +69,8 @@ export default function CustomerSchedule() {
                     .rdp { --rdp-cell-size: 38px; --rdp-accent-color: #2563eb; --rdp-background-color: rgba(37,99,235,0.2); margin: 0; }
                     .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: var(--rdp-accent-color); color: white; font-weight: bold; }
                     .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: rgba(255,255,255,0.1); }
+                    .rdp-caption_label { padding-right: 24px; font-size: 14px; font-weight: bold; }
+                    .rdp-nav { gap: 8px; }
                   `}</style>
                   <DayPicker
                     mode="single"

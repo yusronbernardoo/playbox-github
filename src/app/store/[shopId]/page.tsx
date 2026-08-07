@@ -743,6 +743,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                               .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: var(--rdp-accent-color); color: white; font-weight: bold; }
                               .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: rgba(255,255,255,0.1); }
                               .rdp-day { color: white; font-size: 12px; }
+                              .rdp-caption_label { padding-right: 24px; font-size: 14px; font-weight: bold; }
+                              .rdp-nav { gap: 8px; }
                             `}</style>
                             <DayPicker
                               mode="single"

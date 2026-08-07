@@ -248,6 +248,46 @@ export default function Keuangan() {
     setShowModal(false);
   };
 
+  const handleExportExcel = () => {
+    const csvRows = [];
+    csvRows.push(['LAPORAN KEUANGAN']);
+    csvRows.push(['Periode:', period === 'Pilih Tanggal...' && selectedDate ? selectedDate.toLocaleDateString('id-ID') : period]);
+    csvRows.push([]);
+    csvRows.push(['RINGKASAN PENDAPATAN']);
+    csvRows.push(['Sewa Unit', data.rental]);
+    csvRows.push(['Biaya Delivery', data.delivery]);
+    csvRows.push(['Denda', data.denda]);
+    csvRows.push(['Total Pendapatan', data.pendapatan]);
+    csvRows.push([]);
+    csvRows.push(['RINCIAN PENGELUARAN']);
+    
+    let totalPengeluaran = 0;
+    if (data.pengeluaranItems.length > 0) {
+      csvRows.push(['Tanggal', 'Kategori', 'Nominal', 'Deskripsi']);
+      data.pengeluaranItems.forEach(exp => {
+        const dateStr = new Date(exp.createdAt).toLocaleString('id-ID').replace(',', '');
+        csvRows.push([dateStr, exp.category, exp.amount, `"${(exp.desc || '-').replace(/"/g, '""')}"`]);
+        totalPengeluaran += (Number(exp.amount) || 0);
+      });
+    } else {
+      csvRows.push(['Belum ada pengeluaran di periode ini']);
+    }
+    csvRows.push(['Total Pengeluaran', totalPengeluaran]);
+    csvRows.push([]);
+    csvRows.push(['PROFIT BERSIH (Laba)', data.pendapatan - totalPengeluaran]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const dateSuffix = period === 'Pilih Tanggal...' && selectedDate ? selectedDate.toLocaleDateString('id-ID').replace(/\//g, '-') : period.replace(/ /g, '_');
+    link.setAttribute("download", `Laporan_Keuangan_${dateSuffix}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // 2-Step Delete Execution
   const handleConfirmDelete = async () => {
     if (!expenseToDelete) return;
@@ -288,20 +328,29 @@ export default function Keuangan() {
   return (
     <div className="p-4 space-y-7 pb-24 relative min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center mt-2 relative z-20">
+      <div className="flex justify-between items-end mt-2 z-20">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Keuangan Rental</h1>
-          <p className="text-xs text-playbox-text-secondary mt-0.5">Laporan Arus Kas & Laba Bersih</p>
+          <h1 className="text-2xl font-bold tracking-tight">Keuangan</h1>
+          <p className="text-playbox-text-secondary text-sm mt-0.5 tracking-wide">Ringkasan transaksi Anda</p>
         </div>
-
-        <div className="relative">
-          <div 
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center space-x-2 bg-white/5 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2 cursor-pointer font-medium hover:bg-white/10 transition-colors shadow-sm backdrop-blur-md"
+        
+        <div className="flex items-center gap-2 relative">
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center space-x-1.5 bg-[#107C41]/20 border border-[#107C41]/40 text-[#107C41] text-xs rounded-xl px-3.5 py-2 cursor-pointer font-bold hover:bg-[#107C41]/30 transition-colors shadow-sm backdrop-blur-md"
           >
-            <span>{period}</span>
-            <span className={`text-[10px] transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
-          </div>
+            <span>📊</span>
+            <span>Export Excel</span>
+          </button>
+          
+          <div className="relative">
+            <div 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center space-x-2 bg-white/5 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2 cursor-pointer font-medium hover:bg-white/10 transition-colors shadow-sm backdrop-blur-md"
+            >
+              <span>{period}</span>
+              <span className={`text-[10px] transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
+            </div>
 
           {isDropdownOpen && (
             <div className="absolute right-0 top-full mt-2 w-44 bg-[#10152B]/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-2 z-30">
@@ -323,6 +372,7 @@ export default function Keuangan() {
               ))}
             </div>
           )}
+          </div>
         </div>
       </div>
 
@@ -365,7 +415,7 @@ export default function Keuangan() {
               <span className="font-bold text-white">Rp {data.delivery.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className="text-playbox-text-secondary flex items-center"><span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Denda (Fines)</span>
+              <span className="text-playbox-text-secondary flex items-center"><span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Denda</span>
               <span className="font-bold text-white">Rp {data.denda.toLocaleString('id-ID')}</span>
             </div>
           </div>

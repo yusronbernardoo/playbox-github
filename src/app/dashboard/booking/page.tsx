@@ -13,6 +13,8 @@ export default function BookingList() {
   const filters = ['Semua', 'Perlu Verifikasi', 'Aktif', 'Selesai'];
 
   const [now, setNow] = useState<number>(Date.now());
+  const [bookingToDelete, setBookingToDelete] = useState<string | null>(null);
+  const [deleteConfirmationWord, setDeleteConfirmationWord] = useState('');
 
   useEffect(() => {
     setNow(Date.now());
@@ -41,6 +43,17 @@ export default function BookingList() {
       await deleteDoc(doc(db, 'bookings', id));
     } catch (err) {
       console.error('Error deleting from firestore:', err);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteConfirmationWord.toUpperCase() !== 'HAPUS' || !bookingToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'bookings', bookingToDelete));
+      setBookingToDelete(null);
+      setDeleteConfirmationWord('');
+    } catch (err) {
+      console.error('Error deleting booking:', err);
     }
   };
 
@@ -204,10 +217,19 @@ export default function BookingList() {
                 <p className="text-[11px] font-bold text-playbox-accent mb-1 tracking-wider">{booking.code}</p>
                 <h3 className="font-bold text-lg tracking-tight text-white/90 truncate" title={booking.customer}>{booking.customer}</h3>
               </div>
-              <div className="text-right shrink-0">
-                <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block mb-1 ${getBadgeStyle(displayStatus)}`}>
-                  {displayStatus}
-                </span>
+              <div className="text-right shrink-0 flex flex-col items-end">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block ${getBadgeStyle(displayStatus)}`}>
+                    {displayStatus}
+                  </span>
+                  <button 
+                    onClick={() => setBookingToDelete(booking.id)} 
+                    className="p-1 text-white/30 hover:text-red-500 hover:bg-red-500/20 rounded transition-colors" 
+                    title="Hapus Data Booking"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
                 <p className="text-sm font-black text-playbox-ready whitespace-nowrap">Rp {Number(booking.totalPrice || 0).toLocaleString('id-ID')}</p>
               </div>
             </div>
@@ -286,6 +308,46 @@ export default function BookingList() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {bookingToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-[#161B30] border border-red-500/30 p-6 rounded-3xl max-w-sm w-full shadow-2xl relative">
+            <h3 className="text-xl font-bold text-red-500 mb-2">Peringatan Penghapusan</h3>
+            <p className="text-white/70 text-sm mb-4">
+              Anda akan menghapus data booking secara permanen. Data ini tidak dapat dikembalikan.
+            </p>
+            <div className="mb-5">
+              <label className="block text-xs font-bold text-white/50 uppercase tracking-wider mb-2">Ketik "HAPUS" untuk konfirmasi</label>
+              <input
+                type="text"
+                value={deleteConfirmationWord}
+                onChange={(e) => setDeleteConfirmationWord(e.target.value)}
+                placeholder="HAPUS"
+                className="w-full bg-black/50 border border-red-500/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500 transition-colors uppercase"
+              />
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setBookingToDelete(null);
+                  setDeleteConfirmationWord('');
+                }}
+                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-colors text-sm"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleteConfirmationWord.toUpperCase() !== 'HAPUS'}
+                className="flex-1 py-3 bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-600 text-white font-bold rounded-xl transition-colors text-sm"
+              >
+                Hapus Permanen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
