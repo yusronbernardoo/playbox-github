@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, collection, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, onSnapshot } from 'firebase/firestore';
 
 export default function NewBooking() {
   const router = useRouter();
@@ -18,7 +18,31 @@ export default function NewBooking() {
   
   const [schedule, setSchedule] = useState({ date: '', time: '', duration: 24, durationType: 'Jam' as 'Jam' | 'Hari' | 'Minggu' | 'Bulan' });
   
-  const [customer, setCustomer] = useState({ name: '', phone: '', address: '', requireDelivery: false, instagram: '', emergencyPhone: '' });
+  const [customer, setCustomer] = useState({ name: '', phone: '', address: '', requireDelivery: false, instagram: '', emergencyPhone: '', guaranteeType: 'KTP' });
+  const [blacklistedCustomer, setBlacklistedCustomer] = useState<any>(null);
+
+  useEffect(() => {
+    const checkBlacklist = async () => {
+      const cleanPhone = customer.phone.replace(/\D/g, '');
+      if (cleanPhone.length >= 10) {
+        try {
+          const docRef = doc(db, 'customers', cleanPhone);
+          const snap = await getDoc(docRef);
+          if (snap.exists() && snap.data().isBlacklisted) {
+            setBlacklistedCustomer(snap.data());
+          } else {
+            setBlacklistedCustomer(null);
+          }
+        } catch (e) {
+          console.error("Error checking blacklist:", e);
+        }
+      } else {
+        setBlacklistedCustomer(null);
+      }
+    };
+    const timer = setTimeout(checkBlacklist, 500);
+    return () => clearTimeout(timer);
+  }, [customer.phone]);
   const [deliveryFee, setDeliveryFee] = useState('');
   const [deliveryDistance, setDeliveryDistance] = useState('');
   const [deliveryRules, setDeliveryRules] = useState<{minKm: number, maxKm: number, fee: number}[]>([]);
@@ -259,6 +283,26 @@ export default function NewBooking() {
           ...newBooking,
           createdAt: new Date().toISOString()
         });
+
+        // 1.5 Update Customer CRM Table
+        const custRef = doc(db, 'customers', customer.phone);
+        const custSnap = await getDoc(custRef);
+        if (custSnap.exists()) {
+           await updateDoc(custRef, {
+             totalBookings: (custSnap.data().totalBookings || 0) + 1,
+             totalSpent: (custSnap.data().totalSpent || 0) + total,
+             name: customer.name
+           });
+        } else {
+           await setDoc(custRef, {
+             name: customer.name,
+             phone: customer.phone,
+             totalBookings: 1,
+             totalSpent: total,
+             isBlacklisted: false,
+             blacklistReason: ''
+           });
+        }
       } catch (err) {
         console.error('Failed to save booking to Firestore:', err);
       }
@@ -593,9 +637,34 @@ export default function NewBooking() {
                   type="tel" 
                   value={customer.phone} 
                   onChange={e => setCustomer({...customer, phone: e.target.value.replace(/\D/g, '')})} 
-                  className="w-full p-4 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent" 
+                  className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm focus:outline-none transition-colors ${blacklistedCustomer ? 'border-red-500 focus:border-red-500 bg-red-500/5' : 'border-white/10 focus:border-playbox-accent'}`} 
                   required 
                 />
+                {blacklistedCustomer && (
+                  <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start space-x-3">
+                    <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <div>
+                      <p className="text-red-500 font-bold text-sm">TOLAK PESANAN! Pelanggan Blacklist</p>
+                      <p className="text-red-400 text-xs mt-1">Alasan: {blacklistedCustomer.blacklistReason || 'Tidak diketahui'}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Jaminan Identitas</label>
+                <select 
+                  value={customer.guaranteeType}
+                  onChange={(e) => setCustomer({...customer, guaranteeType: e.target.value})}
+                  className="w-full p-4 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent appearance-none"
+                >
+                  <option value="KTP">KTP Asli</option>
+                  <option value="SIM">SIM Asli</option>
+                  <option value="Kartu Pelajar">Kartu Pelajar / Mahasiswa Asli</option>
+                  <option value="BPKB">BPKB Asli</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+                <p className="text-[10px] text-playbox-text-secondary mt-1 ml-1">Sistem akan mengingatkan Anda untuk mengembalikan ini saat unit dikembalikan.</p>
               </div>
               <div>
                 <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">No HP Darurat (Wajib)</label>
@@ -881,10 +950,13 @@ export default function NewBooking() {
         <div className="mt-8 pt-4 border-t border-white/5 mb-12 relative z-10">
           <button 
             type="submit" 
-            disabled={step === 1 && !selectedUnitId}
+            disabled={
+              (step === 1 && !selectedUnitId) || 
+              (step === 3 && blacklistedCustomer !== null)
+            }
             className={`w-full py-4 rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide transition-all ${
-              step === 1 && !selectedUnitId
-                ? 'bg-white/5 text-white/30 cursor-not-allowed shadow-none' 
+              (step === 1 && !selectedUnitId) || (step === 3 && blacklistedCustomer !== null)
+                ? 'bg-white/5 text-white/30 cursor-not-allowed shadow-none border border-white/5' 
                 : 'saas-button'
             }`}
           >
