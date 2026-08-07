@@ -304,13 +304,13 @@ export default function TimelineBooking() {
         <div className="grid grid-cols-1 gap-4">
           {(bookingData.startTime || bookingData.isoStart) && (bookingData.endTime || bookingData.isoEnd) && (
             <div className="flex flex-col space-y-2 mb-2">
-              <div className="flex justify-between items-center p-4 bg-gradient-to-r from-playbox-accent/20 to-playbox-accent/5 border border-playbox-accent/30 rounded-2xl">
+              <div className="flex justify-between items-center p-4 bg-white/5 border border-white/10 rounded-2xl">
                 <div>
-                  <p className="text-[10px] text-playbox-accent font-bold uppercase tracking-wider mb-1">Mulai Sewa</p>
+                  <p className="text-[10px] text-white/50 font-bold uppercase tracking-wider mb-1">Mulai Sewa</p>
                   <p className="text-sm font-bold text-white">{new Date(bookingData.startTime || bookingData.isoStart).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-playbox-accent font-bold uppercase tracking-wider mb-1">Akhir Sewa</p>
+                  <p className="text-[10px] text-white/50 font-bold uppercase tracking-wider mb-1">Akhir Sewa</p>
                   <p className="text-sm font-bold text-white">{new Date(bookingData.endTime || bookingData.isoEnd).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                 </div>
               </div>
@@ -352,8 +352,8 @@ export default function TimelineBooking() {
             <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Pengiriman (Ongkir)</p>
             <p className="text-sm font-medium text-white/90">
               {bookingData.requireDelivery 
-                ? `🚗 Antar Jemput (Rp ${(bookingData.deliveryFee || 0).toLocaleString('id-ID')})`
-                : '🏬 Ambil di Toko (Tidak ada antar-jemput)'}
+                ? `Antar Jemput (Rp ${(bookingData.deliveryFee || 0).toLocaleString('id-ID')})`
+                : 'Ambil di Toko (Tidak ada antar-jemput)'}
             </p>
           </div>
         </div>
@@ -411,14 +411,26 @@ export default function TimelineBooking() {
 
             let dotColor = 'bg-white/20 border-white/5';
             let textColor = 'text-white/40';
+            let activeBorder = '';
             
             if (isCompleted) {
-              dotColor = 'bg-white/40 border-white/10';
-              textColor = 'text-white/80';
+              dotColor = 'bg-playbox-ready/40 border-playbox-ready/20';
+              textColor = 'text-playbox-ready/80';
             }
             if (isActive) {
-              dotColor = 'bg-playbox-accent border-playbox-accent shadow-[0_0_15px_rgba(37,99,235,0.8)]';
-              textColor = 'text-playbox-accent font-bold';
+              if (stage.includes('Sedang Dipakai') || stage.includes('Dijemput') || stage.includes('Kembali')) {
+                 dotColor = 'bg-orange-500 border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]';
+                 textColor = 'text-orange-500 font-bold';
+                 activeBorder = 'border-l-orange-500';
+              } else if (stage === 'Selesai') {
+                 dotColor = 'bg-playbox-ready border-playbox-ready shadow-[0_0_15px_rgba(34,197,94,0.8)]';
+                 textColor = 'text-playbox-ready font-bold';
+                 activeBorder = 'border-l-playbox-ready';
+              } else {
+                 dotColor = 'bg-playbox-accent border-playbox-accent shadow-[0_0_15px_rgba(37,99,235,0.8)]';
+                 textColor = 'text-playbox-accent font-bold';
+                 activeBorder = 'border-l-playbox-accent';
+              }
             }
 
             return (
@@ -434,12 +446,12 @@ export default function TimelineBooking() {
                   
                   {isCompleted && completedTimes[stepNumber] && (
                     <p className="text-xs text-white/50 mt-1 flex items-center">
-                      <span className="mr-1.5">🕒</span> {completedTimes[stepNumber]}
+                      <span className="mr-1.5 opacity-70">🕒</span> {completedTimes[stepNumber]}
                     </p>
                   )}
 
                   {isActive && (
-                    <div className="mt-3 bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10 border-l-4 border-l-playbox-accent animate-in slide-in-from-top-2 fade-in duration-300">
+                    <div className={`mt-3 bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10 border-l-4 ${activeBorder} animate-in slide-in-from-top-2 fade-in duration-300`}>
                       
                       {stage === 'Foto Kondisi Awal' && (
                         <div className="mb-3 space-y-3">
@@ -462,7 +474,7 @@ export default function TimelineBooking() {
                       
                       <div className="flex space-x-3 text-xs text-white/80 leading-relaxed">
                         <p>
-                          <span className="font-bold text-playbox-accent mr-1">Tugas Anda:</span> Silakan proses pesanan ke tahap <strong className="text-white">{stage}</strong> jika semuanya sudah dipastikan sesuai prosedur.
+                          <span className={`font-bold ${textColor} mr-1`}>Tugas Anda:</span> Silakan proses pesanan ke tahap <strong className="text-white">{stage}</strong> jika semuanya sudah dipastikan sesuai prosedur.
                         </p>
                       </div>
                     </div>
@@ -480,7 +492,15 @@ export default function TimelineBooking() {
           <div className="flex gap-3">
             <button 
               onClick={handleUpdateStatus}
-              className="flex-1 py-4 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(37,99,235,0.25)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
+              className={`flex-1 py-4 text-white rounded-2xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center ${
+                nextStatusName === 'Selesai' 
+                  ? 'bg-playbox-ready text-black shadow-[0_4px_20px_rgba(34,197,94,0.3)]'
+                  : nextStatusName.includes('Dijemput') || nextStatusName.includes('Dikembalikan')
+                  ? 'bg-purple-600 shadow-[0_4px_20px_rgba(147,51,234,0.3)]'
+                  : nextStatusName === 'Sedang Dipakai' || nextStatusName.includes('Pengecekan')
+                  ? 'bg-orange-500 shadow-[0_4px_20px_rgba(249,115,22,0.3)]'
+                  : 'bg-playbox-accent shadow-[0_4px_20px_rgba(37,99,235,0.25)]'
+              }`}
             >
               Update Status ke "{nextStatusName}" <span className="ml-2">→</span>
             </button>
