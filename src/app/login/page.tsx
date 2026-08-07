@@ -63,7 +63,7 @@ export default function LoginPage() {
                 type="text" 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full p-4 pl-11 rounded-2xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent focus:bg-playbox-surface transition-all focus:shadow-[0_0_15px_rgba(226,23,142,0.15)]"
+                className="w-full p-4 pl-11 rounded-2xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent focus:bg-playbox-surface transition-all focus:shadow-[0_0_15px_rgba(37,99,235,0.15)]"
                 placeholder="Masukkan username"
                 required
               />
@@ -77,7 +77,7 @@ export default function LoginPage() {
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-4 pl-11 rounded-2xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent focus:bg-playbox-surface transition-all focus:shadow-[0_0_15px_rgba(226,23,142,0.15)]"
+                className="w-full p-4 pl-11 rounded-2xl bg-black/40 border border-white/5 text-white text-sm focus:outline-none focus:border-playbox-accent focus:bg-playbox-surface transition-all focus:shadow-[0_0_15px_rgba(37,99,235,0.15)]"
                 placeholder="••••••"
                 required
               />
@@ -86,7 +86,7 @@ export default function LoginPage() {
           <button 
             type="submit" 
             disabled={loading || !username || !password}
-            className="w-full py-4 bg-gradient-to-r from-playbox-gradient-start to-playbox-gradient-end text-white rounded-2xl font-bold shadow-[0_8px_30px_rgba(226,23,142,0.4)] tracking-wide hover:shadow-[0_8px_30px_rgba(226,23,142,0.6)] active:scale-95 transition-all text-sm mt-6 disabled:opacity-50 disabled:active:scale-100 disabled:shadow-none border border-white/10"
+            className="w-full py-4 bg-gradient-to-r from-playbox-gradient-start to-playbox-gradient-end text-white rounded-2xl font-bold shadow-[0_8px_30px_rgba(37,99,235,0.4)] tracking-wide hover:shadow-[0_8px_30px_rgba(37,99,235,0.6)] active:scale-95 transition-all text-sm mt-6 disabled:opacity-50 disabled:active:scale-100 disabled:shadow-none border border-white/10"
           >
             {loading ? (
               <span className="flex items-center justify-center space-x-2">

@@ -197,7 +197,7 @@ export default function AdminManagement() {
                   🗑
                 </button>
               )}
-              <button onClick={saveAdmin} className="flex-1 py-4 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_0_20px_rgba(226,23,142,0.4)] hover:bg-[#ff1e9f] transition-all">
+              <button onClick={saveAdmin} className="flex-1 py-4 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-[#ff1e9f] transition-all">
                 Simpan Data
               </button>
             </div>

@@ -362,7 +362,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             </button>
             <button 
               onClick={handleFinish}
-              className="flex-[2] py-4 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(226,23,142,0.4)] tracking-wide hover:bg-opacity-90 active:scale-95 transition-all text-sm"
+              className="flex-[2] py-4 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(37,99,235,0.4)] tracking-wide hover:bg-opacity-90 active:scale-95 transition-all text-sm"
             >
               Selesaikan Pesanan
             </button>

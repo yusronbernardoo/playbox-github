@@ -348,7 +348,7 @@ export default function DashboardHome() {
                     </div>
                     <div className="w-full bg-white/5 rounded-t-sm flex items-end justify-center rounded-b-sm overflow-hidden flex-1 mb-1.5">
                       <div 
-                        className={`w-full rounded-t-sm rounded-b-sm transition-all duration-700 ease-out ${isToday ? 'bg-gradient-to-t from-playbox-gradient-start to-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.5)]' : 'bg-white/30 group-hover:bg-white/50'}`} 
+                        className={`w-full rounded-t-sm rounded-b-sm transition-all duration-700 ease-out ${isToday ? 'bg-gradient-to-t from-playbox-gradient-start to-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.5)]' : 'bg-white/30 group-hover:bg-white/50'}`} 
                         style={{ height: `${heightPercent}%` }}
                       ></div>
                     </div>

@@ -417,7 +417,7 @@ export default function TimelineBooking() {
               textColor = 'text-white/80';
             }
             if (isActive) {
-              dotColor = 'bg-playbox-accent border-playbox-accent shadow-[0_0_15px_rgba(226,23,142,0.8)]';
+              dotColor = 'bg-playbox-accent border-playbox-accent shadow-[0_0_15px_rgba(37,99,235,0.8)]';
               textColor = 'text-playbox-accent font-bold';
             }
 
@@ -480,7 +480,7 @@ export default function TimelineBooking() {
           <div className="flex gap-3">
             <button 
               onClick={handleUpdateStatus}
-              className="flex-1 py-4 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(226,23,142,0.25)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
+              className="flex-1 py-4 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(37,99,235,0.25)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
             >
               Update Status ke "{nextStatusName}" <span className="ml-2">→</span>
             </button>

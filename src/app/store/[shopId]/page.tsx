@@ -356,7 +356,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       <header className="relative z-10 p-5 pt-8 text-center pb-6 border-b border-white/5 bg-black/30 backdrop-blur-md">
         
         {/* Custom Logo / Avatar */}
-        <div className="w-20 h-20 mx-auto rounded-3xl bg-black/40 border border-white/15 flex items-center justify-center shadow-[0_10px_30px_rgba(226,23,142,0.3)] mb-3 overflow-hidden">
+        <div className="w-20 h-20 mx-auto rounded-3xl bg-black/40 border border-white/15 flex items-center justify-center shadow-[0_10px_30px_rgba(37,99,235,0.3)] mb-3 overflow-hidden">
           {shopProfile.logo ? (
             <img src={shopProfile.logo} alt="Shop Logo" className="w-full h-full object-cover" />
           ) : (
@@ -398,7 +398,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                 const ig = shopProfile.instagram?.replace(/^@/, '').trim();
                 window.open(`https://instagram.com/${ig}`, '_blank');
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-xs font-bold hover:bg-pink-500/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(226,23,142,0.15)]"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-xs font-bold hover:bg-pink-500/30 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,99,235,0.15)]"
             >
               <span className="text-sm">📸</span> Instagram
             </button>
@@ -460,7 +460,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     disabled={unit.status !== 'Ready'}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                       unit.status === 'Ready' 
-                      ? 'bg-playbox-accent text-white hover:bg-opacity-90 active:scale-95 shadow-[0_4px_12px_rgba(226,23,142,0.35)]' 
+                      ? 'bg-playbox-accent text-white hover:bg-opacity-90 active:scale-95 shadow-[0_4px_12px_rgba(37,99,235,0.35)]' 
                       : 'bg-white/5 text-white/30 cursor-not-allowed'
                     }`}
                   >
@@ -559,7 +559,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                             onClick={() => setSelectedTierIndex(idx)}
                             className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
                               isSelected 
-                                ? 'bg-playbox-accent/20 border-playbox-accent text-white shadow-[0_0_15px_rgba(226,23,142,0.35)] ring-1 ring-playbox-accent' 
+                                ? 'bg-playbox-accent/20 border-playbox-accent text-white shadow-[0_0_15px_rgba(37,99,235,0.35)] ring-1 ring-playbox-accent' 
                                 : 'bg-black/30 border-white/10 text-white/70 hover:bg-white/5'
                             }`}
                           >
@@ -598,7 +598,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                               <button type="button" onClick={() => setIsDatePickerOpen(false)} className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-white/50 text-xs">✕</button>
                             </div>
                             <style>{`
-                              .rdp { --rdp-cell-size: 34px; --rdp-accent-color: #e2178e; --rdp-background-color: rgba(226,23,142,0.2); margin: 0; }
+                              .rdp { --rdp-cell-size: 34px; --rdp-accent-color: #2563eb; --rdp-background-color: rgba(37,99,235,0.2); margin: 0; }
                               .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: var(--rdp-accent-color); color: white; font-weight: bold; }
                               .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: rgba(255,255,255,0.1); }
                               .rdp-day { color: white; font-size: 12px; }
@@ -703,7 +703,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                                       onClick={() => setCustomTimeInput(t)}
                                       className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
                                         isSelected 
-                                          ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)] scale-105' 
+                                          ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(37,99,235,0.4)] scale-105' 
                                           : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/5'
                                       }`}
                                     >
@@ -726,7 +726,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                                 setCustomTimeInput(finalTime);
                                 setIsTimePickerOpen(false);
                               }}
-                              className="w-full py-4 bg-gradient-to-r from-[#e2178e] via-pink-600 to-purple-600 hover:opacity-95 text-white font-bold rounded-2xl text-sm shadow-[0_4px_20px_rgba(226,23,142,0.35)] active:scale-95 transition-all"
+                              className="w-full py-4 bg-gradient-to-r from-[#2563eb] via-pink-600 to-purple-600 hover:opacity-95 text-white font-bold rounded-2xl text-sm shadow-[0_4px_20px_rgba(37,99,235,0.35)] active:scale-95 transition-all"
                             >
                               Simpan Jam
                             </button>
@@ -921,7 +921,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     <button 
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(226,23,142,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-xs flex items-center justify-center gap-1.5"
+                      className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-xs flex items-center justify-center gap-1.5"
                     >
                       {isSubmitting ? 'Memproses Booking...' : `Konfirmasi Booking (${getTierLabel(activeTier)} - Rp ${Number(activeTier.price || 0).toLocaleString('id-ID')}) →`}
                     </button>

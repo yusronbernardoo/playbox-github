@@ -57,7 +57,7 @@ export default function CustomerSchedule() {
             <div className="relative">
               <div 
                 onClick={() => { setIsDatePickerOpen(!isDatePickerOpen); setIsTimePickerOpen(false); }}
-                className={`w-full p-3 rounded-lg bg-[#1A2240] border text-sm flex justify-between items-center cursor-pointer transition-all ${isDatePickerOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.2)] text-white' : 'border-[#2A3455] hover:border-white/20 text-white/80'}`}
+                className={`w-full p-3 rounded-lg bg-[#1A2240] border text-sm flex justify-between items-center cursor-pointer transition-all ${isDatePickerOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.2)] text-white' : 'border-[#2A3455] hover:border-white/20 text-white/80'}`}
               >
                 {schedule.date ? format(new Date(schedule.date), 'dd MMMM yyyy', { locale: idLocale }) : <span className="text-white/40">Pilih Tanggal</span>}
                 <span className="opacity-70">📅</span>
@@ -66,7 +66,7 @@ export default function CustomerSchedule() {
               {isDatePickerOpen && (
                 <div className="absolute top-full left-0 mt-2 p-3 bg-[#1A2240] border border-[#2A3455] rounded-2xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
                   <style>{`
-                    .rdp { --rdp-cell-size: 38px; --rdp-accent-color: #e2178e; --rdp-background-color: rgba(226,23,142,0.2); margin: 0; }
+                    .rdp { --rdp-cell-size: 38px; --rdp-accent-color: #2563eb; --rdp-background-color: rgba(37,99,235,0.2); margin: 0; }
                     .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: var(--rdp-accent-color); color: white; font-weight: bold; }
                     .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: rgba(255,255,255,0.1); }
                   `}</style>
@@ -108,7 +108,7 @@ export default function CustomerSchedule() {
                   setIsTimePickerOpen(true); 
                   setIsDatePickerOpen(false); 
                 }}
-                className={`w-full p-4 rounded-xl bg-black/20 border text-sm flex justify-between items-center cursor-pointer transition-all ${isTimePickerOpen ? 'border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.2)]' : 'border-[#2A3455] text-white/80'}`}
+                className={`w-full p-4 rounded-xl bg-black/20 border text-sm flex justify-between items-center cursor-pointer transition-all ${isTimePickerOpen ? 'border-playbox-accent text-white shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'border-[#2A3455] text-white/80'}`}
               >
                 {schedule.time || <span className="text-white/40">00:00</span>}
                 <span className="opacity-70">⏰</span>
@@ -170,7 +170,7 @@ export default function CustomerSchedule() {
                             key={t}
                             type="button"
                             onClick={() => setTempTime(t)}
-                            className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)] scale-105' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:text-white'}`}
+                            className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${tempTime === t ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_4px_15px_rgba(37,99,235,0.4)] scale-105' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:text-white'}`}
                           >
                             {t}
                           </button>
@@ -188,7 +188,7 @@ export default function CustomerSchedule() {
                         setSchedule({...schedule, time: finalTime});
                         setIsTimePickerOpen(false);
                       }}
-                      className="w-full py-4 bg-gradient-to-r from-[#e2178e] via-pink-600 to-purple-600 hover:opacity-95 text-white font-bold rounded-2xl text-sm shadow-[0_4px_20px_rgba(226,23,142,0.35)] active:scale-95 transition-all"
+                      className="w-full py-4 bg-gradient-to-r from-[#2563eb] via-pink-600 to-purple-600 hover:opacity-95 text-white font-bold rounded-2xl text-sm shadow-[0_4px_20px_rgba(37,99,235,0.35)] active:scale-95 transition-all"
                     >
                       Simpan Jam
                     </button>

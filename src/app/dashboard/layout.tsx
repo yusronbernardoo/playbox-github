@@ -13,9 +13,8 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
       <div className="min-h-screen bg-playbox-bg flex items-center justify-center relative overflow-hidden">
         <div className="ambient-glow"></div>
         <div className="flex flex-col items-center z-10 animate-in fade-in duration-500">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-3xl font-black text-white shadow-[0_0_40px_rgba(226,23,142,0.4)] mb-5 relative">
-            <div className="absolute inset-0 rounded-3xl border-2 border-playbox-accent/30 animate-ping"></div>
-            P
+          <div className="w-24 h-16 mb-5 relative flex justify-center items-center">
+            <img src="/renterva-logo.png" alt="Renterva Play" className="w-full h-full object-contain animate-pulse drop-shadow-[0_0_15px_rgba(37,99,235,0.4)]" />
           </div>
           <p className="text-xs font-bold text-playbox-text-secondary uppercase tracking-widest mb-3 animate-pulse">Menyiapkan Workspace</p>
           <div className="flex space-x-2">
@@ -53,10 +52,10 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
             >
               {/* Active Indicator Glow */}
               {isActive && (
-                <div className="absolute -top-3 w-8 h-1 bg-playbox-accent rounded-b-full shadow-[0_4px_12px_rgba(226,23,142,0.8)]"></div>
+                <div className="absolute -top-3 w-8 h-1 bg-playbox-accent rounded-b-full shadow-[0_4px_12px_rgba(37,99,235,0.8)]"></div>
               )}
               
-              <span className={`text-xl mb-1 transition-transform duration-300 ${isActive ? '-translate-y-1 drop-shadow-[0_0_8px_rgba(226,23,142,0.5)]' : 'group-hover:-translate-y-0.5 opacity-70 group-hover:opacity-100'}`}>
+              <span className={`text-xl mb-1 transition-transform duration-300 ${isActive ? '-translate-y-1 drop-shadow-[0_0_8px_rgba(37,99,235,0.5)]' : 'group-hover:-translate-y-0.5 opacity-70 group-hover:opacity-100'}`}>
                 {tab.icon}
               </span>
               <span className={`text-[10px] font-medium transition-all duration-300 ${isActive ? 'text-white' : 'text-playbox-text-secondary opacity-70 group-hover:opacity-100'}`}>
@@ -114,8 +113,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen bg-playbox-bg flex items-center justify-center relative overflow-hidden">
         <div className="ambient-glow"></div>
         <div className="flex flex-col items-center z-10 animate-pulse">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-3xl font-black text-white shadow-[0_0_40px_rgba(226,23,142,0.4)] mb-4">
-            P
+          <div className="w-24 h-16 mb-4 flex justify-center items-center">
+             <img src="/renterva-logo.png" alt="Renterva Play" className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(37,99,235,0.4)]" />
           </div>
         </div>
       </div>

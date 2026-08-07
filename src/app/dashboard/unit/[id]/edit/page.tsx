@@ -220,7 +220,7 @@ export default function EditUnit() {
             <div className="relative">
               <div 
                 onClick={() => setIsTypeOpen(!isTypeOpen)}
-                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.2)]' : 'border-white/10 hover:border-white/20'}`}
+                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'border-white/10 hover:border-white/20'}`}
               >
                 <span>{unit.type}</span>
                 <span className={`text-[10px] transition-transform duration-300 ${isTypeOpen ? 'rotate-180 text-playbox-accent' : 'opacity-50'}`}>▼</span>
@@ -248,7 +248,7 @@ export default function EditUnit() {
             <div className="relative">
               <div 
                 onClick={() => setIsStatusOpen(!isStatusOpen)}
-                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.2)]' : 'border-white/10 hover:border-white/20'}`}
+                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'border-white/10 hover:border-white/20'}`}
               >
                 <div className="flex items-center">
                   <span className={`w-2 h-2 rounded-full mr-2 ${unit.status === 'Ready' ? 'bg-playbox-ready' : unit.status === 'Disewa' ? 'bg-playbox-disewa' : 'bg-gray-400'}`}></span>
@@ -307,7 +307,7 @@ export default function EditUnit() {
                         type="button"
                         onClick={() => setOpenUnitTierDropdown(openUnitTierDropdown === idx ? null : idx)}
                         className={`w-full p-3 rounded-xl bg-black/40 border text-white text-sm flex items-center justify-between transition-all font-bold ${
-                          openUnitTierDropdown === idx ? 'border-playbox-accent shadow-[0_0_12px_rgba(226,23,142,0.35)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'
+                          openUnitTierDropdown === idx ? 'border-playbox-accent shadow-[0_0_12px_rgba(37,99,235,0.35)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'
                         }`}
                       >
                         <span className="truncate">{tier.durationUnit || 'Jam'}</span>
@@ -431,7 +431,7 @@ export default function EditUnit() {
           <div className="max-w-md mx-auto">
             <button 
               type="submit" 
-              className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(226,23,142,0.4)] text-sm tracking-wide"
+              className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide"
             >
               Simpan Perubahan
             </button>

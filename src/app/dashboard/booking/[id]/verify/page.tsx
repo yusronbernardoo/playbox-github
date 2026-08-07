@@ -567,7 +567,7 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
           ) : booking.status === 'Menunggu Pembayaran' ? (
             <button 
               onClick={handleMarkAsPaid} 
-              className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(226,23,142,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-sm flex items-center justify-center"
+              className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-sm flex items-center justify-center"
             >
               ✅ Konfirmasi Lunas & Aktifkan Unit
             </button>

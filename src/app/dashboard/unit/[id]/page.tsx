@@ -157,7 +157,7 @@ export default function UnitDetail() {
           >
             <span className="text-lg opacity-70 group-hover:opacity-100 transition-opacity">🗑️</span>
           </button>
-          <Link href={`/dashboard/unit/${id}/edit`} className="flex-1 py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(226,23,142,0.4)] text-sm tracking-wide text-center">
+          <Link href={`/dashboard/unit/${id}/edit`} className="flex-1 py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide text-center">
             Edit Unit
           </Link>
         </div>

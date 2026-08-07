@@ -63,10 +63,10 @@ export default function LainnyaPage() {
           <img 
             src={shopLogo} 
             alt="Logo Toko" 
-            className="w-16 h-16 rounded-full object-cover border-2 border-playbox-accent shadow-[0_4px_20px_rgba(226,23,142,0.3)] bg-black/40 flex-shrink-0"
+            className="w-16 h-16 rounded-full object-cover border-2 border-playbox-accent shadow-[0_4px_20px_rgba(37,99,235,0.3)] bg-black/40 flex-shrink-0"
           />
         ) : (
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-white text-2xl font-bold uppercase shadow-[0_4px_20px_rgba(226,23,142,0.3)] flex-shrink-0">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-white text-2xl font-bold uppercase shadow-[0_4px_20px_rgba(37,99,235,0.3)] flex-shrink-0">
             {shopName.charAt(0) || 'P'}
           </div>
         )}
@@ -86,7 +86,7 @@ export default function LainnyaPage() {
               <div className="bg-playbox-surface rounded-xl border border-white/10 overflow-hidden shadow-sm">
                 <div className="divide-y divide-white/5">
                   <Link href="/dashboard/lainnya/toko" className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors group relative overflow-hidden bg-gradient-to-r from-playbox-accent/10 to-transparent">
-                    <div className="absolute left-0 top-0 w-1 h-full bg-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.5)]"></div>
+                    <div className="absolute left-0 top-0 w-1 h-full bg-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.5)]"></div>
                     <div className="flex items-center space-x-4">
                       <div className="w-8 h-8 rounded-full bg-playbox-accent/20 flex items-center justify-center">
                         <svg className="w-4 h-4 text-playbox-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>

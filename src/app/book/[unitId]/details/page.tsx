@@ -136,7 +136,7 @@ export default function CustomerDetails() {
         <div className="mt-auto pt-6 pb-8">
           <button 
             type="submit" 
-            className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white hover:scale-[1.02] transition-all shadow-[0_4px_15px_rgba(226,23,142,0.4)]"
+            className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white hover:scale-[1.02] transition-all shadow-[0_4px_15px_rgba(37,99,235,0.4)]"
           >
             Selesaikan Booking
           </button>

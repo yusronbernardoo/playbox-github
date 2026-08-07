@@ -101,7 +101,7 @@ export default function BookingList() {
       {/* Header */}
       <div className="flex justify-between items-center mt-2">
         <h1 className="text-2xl font-bold tracking-tight">Booking</h1>
-        <Link href="/dashboard/booking/new" className="saas-button px-4 py-2 rounded-xl text-sm flex items-center shadow-sm hover:shadow-[0_4px_15px_rgba(226,23,142,0.5)] transition-all">
+        <Link href="/dashboard/booking/new" className="saas-button px-4 py-2 rounded-xl text-sm flex items-center shadow-sm hover:shadow-[0_4px_15px_rgba(37,99,235,0.5)] transition-all">
           <span className="mr-1 text-lg font-light leading-none">+</span> Catat Manual
         </Link>
       </div>
@@ -157,7 +157,7 @@ export default function BookingList() {
               const h = Math.floor(diff / (1000 * 60 * 60));
               const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
               timerBadge = (
-                <span className="bg-playbox-accent text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(226,23,142,0.6)]">
+                <span className="bg-playbox-accent text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(37,99,235,0.6)]">
                   ⏱️ Sisa: {h} Jam {m} Mnt
                 </span>
               );

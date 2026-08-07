@@ -115,7 +115,7 @@ export default function UnitList() {
       <div className="flex justify-between items-center mt-2">
         <h1 className="text-2xl font-bold tracking-tight">Daftar Unit</h1>
         {role === 'owner' && (
-          <Link href="/dashboard/unit/new" className="saas-button px-4 py-2 rounded-xl text-sm flex items-center shadow-[0_4px_15px_rgba(226,23,142,0.4)]">
+          <Link href="/dashboard/unit/new" className="saas-button px-4 py-2 rounded-xl text-sm flex items-center shadow-[0_4px_15px_rgba(37,99,235,0.4)]">
             <span className="mr-1 text-lg font-light leading-none">+</span> Tambah
           </Link>
         )}

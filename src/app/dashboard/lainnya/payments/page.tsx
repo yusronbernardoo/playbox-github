@@ -315,7 +315,7 @@ export default function PaymentMethods() {
         <button 
           onClick={openAddModal}
           type="button" 
-          className="w-full py-4 bg-gradient-to-r from-playbox-accent to-pink-600 text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(226,23,142,0.4)] hover:opacity-90 transition-all text-sm tracking-wide"
+          className="w-full py-4 bg-gradient-to-r from-playbox-accent to-pink-600 text-white rounded-2xl font-bold shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:opacity-90 transition-all text-sm tracking-wide"
         >
           + Tambah Rekening / E-Wallet / QRIS
         </button>
@@ -457,7 +457,7 @@ export default function PaymentMethods() {
                 type="button"
                 onClick={saveMethod} 
                 disabled={isSaving || isCompressing}
-                className="flex-1 py-4 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_0_20px_rgba(226,23,142,0.4)] hover:bg-[#ff1e9f] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                className="flex-1 py-4 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-[#ff1e9f] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
               >
                 {isSaving ? 'Menyimpan Data...' : 'Simpan Data Pembayaran'}
               </button>

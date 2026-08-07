@@ -276,7 +276,7 @@ export default function NewBooking() {
       if (savedUnits) {
         const units = JSON.parse(savedUnits);
         const updatedUnits = units.map((u: any) => 
-          u.id === selectedUnit.id ? { ...u, status: 'Disewa', statusColor: 'bg-playbox-disewa/15 text-playbox-accent shadow-[0_0_10px_rgba(226,23,142,0.3)]' } : u
+          u.id === selectedUnit.id ? { ...u, status: 'Disewa', statusColor: 'bg-playbox-disewa/15 text-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.3)]' } : u
         );
         localStorage.setItem('playbox_mock_units', JSON.stringify(updatedUnits));
       }
@@ -303,7 +303,7 @@ export default function NewBooking() {
         {[1, 2, 3, 4, 5].map(s => (
           <div key={s} className="flex flex-col items-center flex-1 relative">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 z-10 ${
-              step >= s ? 'bg-playbox-accent text-white shadow-[0_0_15px_rgba(226,23,142,0.6)] scale-110' : 'bg-white/5 text-white/40'
+              step >= s ? 'bg-playbox-accent text-white shadow-[0_0_15px_rgba(37,99,235,0.6)] scale-110' : 'bg-white/5 text-white/40'
             }`}>
               {s}
             </div>
@@ -351,7 +351,7 @@ export default function NewBooking() {
                       }}
                       className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
                         isSelected 
-                          ? 'border-playbox-accent bg-playbox-accent/10 shadow-[0_4px_20px_rgba(226,23,142,0.2)] scale-[1.01]' 
+                          ? 'border-playbox-accent bg-playbox-accent/10 shadow-[0_4px_20px_rgba(37,99,235,0.2)] scale-[1.01]' 
                           : 'border-white/5 bg-black/20 hover:bg-white/5 hover:border-white/10'
                       }`}
                     >
@@ -415,13 +415,13 @@ export default function NewBooking() {
                           }}
                           className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
                             isSelected 
-                              ? 'border-playbox-accent bg-playbox-accent/15 shadow-[0_4px_20px_rgba(226,23,142,0.25)] ring-1 ring-playbox-accent' 
+                              ? 'border-playbox-accent bg-playbox-accent/15 shadow-[0_4px_20px_rgba(37,99,235,0.25)] ring-1 ring-playbox-accent' 
                               : 'border-white/10 bg-black/30 hover:border-white/20 hover:bg-white/5'
                           }`}
                         >
                           <div className="flex items-center space-x-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
-                              isSelected ? 'bg-playbox-accent text-white shadow-[0_0_12px_rgba(226,23,142,0.5)]' : 'bg-white/5 text-white/60'
+                              isSelected ? 'bg-playbox-accent text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]' : 'bg-white/5 text-white/60'
                             }`}>
                               {tier.durationUnit === 'Bulan' ? '🌙' : tier.durationUnit === 'Minggu' ? '📆' : tier.durationUnit === 'Hari' ? '📅' : '⏱️'}
                             </div>
@@ -467,7 +467,7 @@ export default function NewBooking() {
                         </div>
                         <div className="flex justify-center">
                           <style>{`
-                            .rdp { --rdp-cell-size: 36px; --rdp-accent-color: #e2178e; margin: 0; font-size: 14px; }
+                            .rdp { --rdp-cell-size: 36px; --rdp-accent-color: #2563eb; margin: 0; font-size: 14px; }
                             .rdp-day_selected { background-color: var(--rdp-accent-color); color: white; font-weight: bold; }
                             .rdp-head_cell { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; }
                             .rdp-caption_label { font-size: 16px; font-weight: bold; text-transform: capitalize; color: white; }
@@ -557,7 +557,7 @@ export default function NewBooking() {
                         onClick={() => setSchedule({...schedule, time: t})}
                         className={`px-2 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all border ${
                           schedule.time === t 
-                            ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(226,23,142,0.4)]' 
+                            ? 'bg-playbox-accent border-playbox-accent text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]' 
                             : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
                         }`}
                       >
@@ -791,7 +791,7 @@ export default function NewBooking() {
                       key={m}
                       type="button"
                       onClick={() => setPayment({...payment, method: m})}
-                      className={`flex-1 py-3.5 rounded-xl text-sm font-medium transition-all ${payment.method === m ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(226,23,142,0.4)] border border-playbox-accent' : 'bg-black/20 text-white/60 hover:bg-white/10 border border-white/10'}`}
+                      className={`flex-1 py-3.5 rounded-xl text-sm font-medium transition-all ${payment.method === m ? 'bg-playbox-accent text-white shadow-[0_4px_15px_rgba(37,99,235,0.4)] border border-playbox-accent' : 'bg-black/20 text-white/60 hover:bg-white/10 border border-white/10'}`}
                     >
                       {m}
                     </button>
@@ -883,7 +883,7 @@ export default function NewBooking() {
             <button 
               type="submit" 
               disabled={step === 1 && !selectedUnitId}
-              className={`w-full py-4 rounded-2xl font-semibold shadow-[0_4px_20px_rgba(226,23,142,0.4)] text-sm tracking-wide transition-all ${
+              className={`w-full py-4 rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide transition-all ${
                 step === 1 && !selectedUnitId
                   ? 'bg-white/5 text-white/30 cursor-not-allowed shadow-none' 
                   : 'saas-button'

@@ -13,7 +13,7 @@ export default function NotificationToast() {
   return (
     <div className="fixed top-4 left-4 right-4 z-[100] animate-in slide-in-from-top-4 fade-in duration-300">
       <div 
-        className="bg-[#0E1221]/90 backdrop-blur-xl border border-playbox-accent/40 rounded-2xl p-4 shadow-[0_10px_40px_rgba(226,23,142,0.4)] flex items-start space-x-3 cursor-pointer hover:bg-[#0E1221]" 
+        className="bg-[#0E1221]/90 backdrop-blur-xl border border-playbox-accent/40 rounded-2xl p-4 shadow-[0_10px_40px_rgba(37,99,235,0.4)] flex items-start space-x-3 cursor-pointer hover:bg-[#0E1221]" 
         onClick={() => {
           router.push(`/dashboard/booking`);
           clearToast();

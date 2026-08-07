@@ -92,7 +92,7 @@ export default function BusinessSettings() {
           <div className="max-w-md mx-auto">
             <button 
               type="submit" 
-              className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(226,23,142,0.4)] text-sm tracking-wide"
+              className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide"
             >
               Simpan Perubahan
             </button>
