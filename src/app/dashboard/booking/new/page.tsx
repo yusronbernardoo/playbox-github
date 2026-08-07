@@ -877,21 +877,19 @@ export default function NewBooking() {
           </div>
         )}
 
-        {/* Sticky Action Button */}
-        <div className="fixed bottom-[72px] w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-playbox-bg/80 backdrop-blur-xl border-t border-white/5 z-40">
-          <div className="max-w-md mx-auto">
-            <button 
-              type="submit" 
-              disabled={step === 1 && !selectedUnitId}
-              className={`w-full py-4 rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide transition-all ${
-                step === 1 && !selectedUnitId
-                  ? 'bg-white/5 text-white/30 cursor-not-allowed shadow-none' 
-                  : 'saas-button'
-              }`}
-            >
-              {step === 5 ? 'Konfirmasi & Selesai' : 'Lanjutkan ke Tahap ' + (step + 1)}
-            </button>
-          </div>
+        {/* Action Button */}
+        <div className="mt-8 pt-4 border-t border-white/5 mb-12 relative z-10">
+          <button 
+            type="submit" 
+            disabled={step === 1 && !selectedUnitId}
+            className={`w-full py-4 rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide transition-all ${
+              step === 1 && !selectedUnitId
+                ? 'bg-white/5 text-white/30 cursor-not-allowed shadow-none' 
+                : 'saas-button'
+            }`}
+          >
+            {step === 5 ? 'Konfirmasi & Selesai' : 'Lanjutkan ke Tahap ' + (step + 1)}
+          </button>
         </div>
       </form>
     </div>
