@@ -221,19 +221,26 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
   const handleMarkAsPaid = async () => {
     const confirm = window.confirm('Apakah bukti transfer sudah valid dan uang sudah diterima?');
     if (confirm) {
-      const now = new Date();
-      const dur = Number(booking.durationHours || booking.duration || 24);
-      const endTime = new Date(now.getTime() + (dur * 60 * 60 * 1000));
-      
       // 1. Update status booking menjadi Sedang Dipakai
-      await handleUpdateStatus('Sedang Dipakai', 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20', { 
+      // Jangan timpa isoStart dan isoEnd jika customer sudah memilih jadwal di masa depan!
+      const updateData: any = { 
         needAction: false,
-        startTime: now.toISOString(),
-        endTime: endTime.toISOString(),
-        isoStart: now.toISOString(),
-        isoEnd: endTime.toISOString(),
         paymentStatus: 'Lunas'
-      });
+      };
+
+      if (!booking.isoStart) {
+        // Fallback untuk data lama yang tidak punya isoStart
+        const now = new Date();
+        const dur = Number(booking.durationHours || booking.duration || 24);
+        const endTime = new Date(now.getTime() + (dur * 60 * 60 * 1000));
+        
+        updateData.startTime = now.toISOString();
+        updateData.endTime = endTime.toISOString();
+        updateData.isoStart = now.toISOString();
+        updateData.isoEnd = endTime.toISOString();
+      }
+
+      await handleUpdateStatus('Sedang Dipakai', 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20', updateData);
       
       // 2. Update status unit di katalog (Firestore & localStorage)
       try {

@@ -202,7 +202,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     // OPTIMIZED: Only fetch active bookings so it loads instantly!
     const activeBookingsQuery = query(
       collection(db, 'bookings'),
-      where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa'])
+      where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa', 'Sedang Dipakai'])
     );
     
     const unsubscribeBookings = onSnapshot(activeBookingsQuery, (snapshot) => {
