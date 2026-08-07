@@ -54,6 +54,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
   const [topUnits, setTopUnits] = useState<any[]>([]);
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     setIsMounted(true);
@@ -63,11 +64,16 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     else if (hour < 15) setGreeting("Selamat Siang");
     else if (hour < 18) setGreeting("Selamat Sore");
     else setGreeting("Selamat Malam");
+
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
     loadDashboardData();
-  }, [bookings, units]);
+  }, [bookings, units, currentTime]);
 
   const loadDashboardData = () => {
     // 2. Load Bookings
@@ -110,7 +116,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
         ['Perlu Verifikasi', 'Persiapan', 'Diantar', 'Menunggu Pembayaran'].includes(b.status) || b.needAction === true
       );
 
-      const now = new Date();
+      const now = currentTime;
       localBookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           totalRevenue += (Number(b.totalPrice) || 0);
@@ -146,6 +152,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
                 const lateFineRate = 20000;
                 const totalLateEst = lateHours * lateFineRate;
 
+                initialPendingTasks = initialPendingTasks.filter((t: any) => t.id !== b.id);
                 initialPendingTasks.unshift({
                   ...b,
                   isWarning: true,
@@ -154,6 +161,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
                 });
               } else if (diffMins <= 30) {
                 // Hampir Habis (30 min warning)
+                initialPendingTasks = initialPendingTasks.filter((t: any) => t.id !== b.id);
                 initialPendingTasks.unshift({
                   ...b,
                   isWarning: true,
