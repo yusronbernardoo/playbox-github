@@ -31,6 +31,7 @@ export default function DashboardHome() {
   const [revenue, setRevenue] = useState(0);
   const [chartData, setChartData] = useState({ data: [0,0,0,0,0,0,0], labels: ['','','','','','',''], max: 1 });
   const [topUnits, setTopUnits] = useState<any[]>([]);
+  const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -398,6 +399,7 @@ export default function DashboardHome() {
               ))}
             </div>
           </div>
+        </div>
       </section>
 
       {/* Perlu Dikerjakan (Overdue Fines Alert & Urgent Tasks) */}
