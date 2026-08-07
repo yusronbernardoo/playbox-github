@@ -163,15 +163,39 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
     // 2. Real-time Units & Active Bookings Listener
     let activeBusyKeys = new Set<string>();
+    let cachedActiveBookings: any[] = [];
     let rawUnitsList: any[] = [];
 
     const updateCombinedUnits = (unitsData: any[]) => {
+      const now = Date.now();
       return unitsData.map(u => {
         if (u.status === 'Maintenance') return u;
-        const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
+
+        const unitBookings = cachedActiveBookings.filter(b => b.unitId === u.id || b.unit === u.name);
+        
+        let isCurrentlyBusy = false;
+        let nextBooking = null;
+        let nextBookingStartMs = Infinity;
+
+        unitBookings.forEach(b => {
+          const startMs = b.isoStart ? new Date(b.isoStart).getTime() : 
+                         (b.startTime ? new Date(`${b.startDate || ''} ${b.startTime}`).getTime() : 0);
+          const durHours = Number(b.durationHours || b.duration || 24);
+          const endMs = b.isoEnd ? new Date(b.isoEnd).getTime() : startMs + (durHours * 60 * 60 * 1000);
+
+          if (now >= startMs && now <= endMs) {
+            isCurrentlyBusy = true;
+          } else if (startMs > now && startMs < nextBookingStartMs) {
+            nextBooking = b;
+            nextBookingStartMs = startMs;
+          }
+        });
+
+        const isBusy = isCurrentlyBusy || activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
         return {
           ...u,
-          status: isBusy ? 'Disewa' : (u.status || 'Ready')
+          status: isBusy ? 'Disewa' : (u.status || 'Ready'),
+          nextBooking: !isBusy && nextBooking ? nextBooking : null
         };
       });
     };
@@ -208,6 +232,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     const unsubscribeBookings = onSnapshot(activeBookingsQuery, (snapshot) => {
       const activeBookings = snapshot.docs.map(doc => doc.data());
       setActiveBookingsList(activeBookings);
+      cachedActiveBookings = activeBookings;
       
       const now = Date.now();
       const busySet = new Set<string>();
@@ -540,8 +565,24 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     ))}
                   </div>
                 </div>
+
+                {unit.nextBooking && (
+                  <div className="mt-2 bg-orange-500/10 border border-orange-500/20 p-2 rounded-lg flex items-start gap-1.5 shadow-inner">
+                    <span className="text-orange-500 text-[10px] shrink-0 mt-0.5">⚠️</span>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-0.5 leading-tight">
+                        Telah dipesan untuk:
+                      </p>
+                      <p className="text-[9px] font-medium text-orange-400/90 leading-tight">
+                        {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
+                        <span className="opacity-70 ml-1">({unit.nextBooking.durationHours || unit.nextBooking.duration || 24} Jam)</span>
+                      </p>
+                      <p className="text-[8px] text-orange-500/60 mt-1 italic leading-tight">Silakan sewa jika durasi Anda tidak menabrak jadwal ini.</p>
+                    </div>
+                  </div>
+                )}
                 
-                <div className="flex justify-between items-end mt-2 pt-1 border-t border-white/5">
+                <div className="flex justify-between items-end mt-2 pt-2 border-t border-white/5">
                   <div>
                     <p className="text-[9px] uppercase tracking-wider text-white/40 font-semibold">Mulai Dari</p>
                     <p className="text-xs font-black text-white">

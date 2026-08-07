@@ -258,7 +258,10 @@ export default function UnitList() {
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider mb-0.5">Akan Disewa: {unit.nextBooking.customer}</p>
                     <p className="text-[10px] font-medium text-yellow-500/80 truncate">
-                      🗓️ {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB
+                      🗓️ {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
+                      <span className="opacity-70 ml-1">
+                        (Selama {unit.nextBooking.durationHours || unit.nextBooking.duration || 24} Jam)
+                      </span>
                     </p>
                   </div>
                 </div>
