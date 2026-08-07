@@ -195,6 +195,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
           setUnits([]);
         }
       }
+      setIsLoading(false);
     });
 
     // 2. Real-time Units & Active Bookings Listener
