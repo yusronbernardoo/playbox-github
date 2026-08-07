@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { useFirebase } from '@/context/FirebaseContext';
 
 export default function DashboardHome() {
+  const { bookings } = useFirebase();
   const [greeting, setGreeting] = useState("Halo");
   const [businessName, setBusinessName] = useState("PlayBox Malang");
   const [shopLogo, setShopLogo] = useState<string>("");
@@ -62,27 +64,17 @@ export default function DashboardHome() {
       }
     });
 
-    // 3. Real-time Bookings Listener
-    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudBookings: any[] = [];
-        snapshot.forEach((docSnap) => {
-          cloudBookings.push({ ...docSnap.data(), id: docSnap.id });
-        });
-        cloudBookings.sort((a, b) => (b.createdAt || b.id).localeCompare(a.createdAt || a.id));
-        localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
-        loadDashboardData(cloudBookings);
-      }
-    });
-
-    loadDashboardData();
+    // 3. Real-time Bookings is now handled by FirebaseContext
 
     return () => {
       unsubscribeShop();
       unsubscribeUnits();
-      unsubscribeBookings();
     };
   }, []);
+
+  useEffect(() => {
+    loadDashboardData(bookings);
+  }, [bookings]);
 
   const loadDashboardData = (customBookings?: any[], customUnits?: any[]) => {
     // 1. Calculate Unit Stats

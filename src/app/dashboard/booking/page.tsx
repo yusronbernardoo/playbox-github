@@ -2,14 +2,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { useFirebase } from '@/context/FirebaseContext';
 
 export default function BookingList() {
+  const { bookings } = useFirebase();
   const [filter, setFilter] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const filters = ['Semua', 'Perlu Verifikasi', 'Aktif', 'Selesai'];
 
-  const [bookings, setBookings] = useState<any[]>([]);
   const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
@@ -21,41 +22,12 @@ export default function BookingList() {
       setFilter(filterParam);
     }
 
-    // 1. Real-Time Cloud Firestore Listener
-    const unsubscribe = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudBookings: any[] = [];
-        snapshot.forEach((docSnap) => {
-          cloudBookings.push({ ...docSnap.data(), id: docSnap.id });
-        });
-        
-        // Sort descending by id/createdAt
-        cloudBookings.sort((a, b) => (b.createdAt || b.id).localeCompare(a.createdAt || a.id));
-        setBookings(cloudBookings);
-        localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
-      } else {
-        const saved = localStorage.getItem('playbox_mock_bookings');
-        if (saved) {
-          try {
-            setBookings(JSON.parse(saved));
-          } catch {
-            setBookings([]);
-          }
-        }
-      }
-    }, (error) => {
-      console.warn('Firestore real-time error (fallback to local):', error);
-      const saved = localStorage.getItem('playbox_mock_bookings');
-      if (saved) setBookings(JSON.parse(saved));
-    });
-
     // Live countdown timer (tick every 10 seconds for smoothness)
     const interval = setInterval(() => {
       setNow(Date.now());
     }, 10000);
 
     return () => {
-      unsubscribe();
       clearInterval(interval);
     };
   }, []);
@@ -69,9 +41,6 @@ export default function BookingList() {
     } catch (err) {
       console.error('Error deleting from firestore:', err);
     }
-    const updated = bookings.filter(b => b.id !== id);
-    setBookings(updated);
-    localStorage.setItem('playbox_mock_bookings', JSON.stringify(updated));
   };
 
   const formatCustomDate = (dateVal?: string) => {
