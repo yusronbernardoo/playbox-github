@@ -63,46 +63,27 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     else if (hour < 15) setGreeting("Selamat Siang");
     else if (hour < 18) setGreeting("Selamat Sore");
     else setGreeting("Selamat Malam");
-
-
-
-    // 2. Real-time Units Listener
-    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudUnits: any[] = [];
-        snapshot.forEach((docSnap) => {
-          cloudUnits.push({ ...docSnap.data(), id: docSnap.id });
-        });
-        localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
-        loadDashboardData(undefined, cloudUnits);
-      }
-    });
-
-    // 3. Real-time Bookings is now handled by FirebaseContext
-
-    return () => {
-      unsubscribeUnits();
-    };
   }, []);
 
   useEffect(() => {
-    loadDashboardData(bookings, units);
+    loadDashboardData();
   }, [bookings, units]);
 
-  const loadDashboardData = (customBookings?: any[], customUnits?: any[]) => {
+  const loadDashboardData = () => {
     // 2. Load Bookings
-    const savedBookings = customBookings || (localStorage.getItem('playbox_mock_bookings') ? JSON.parse(localStorage.getItem('playbox_mock_bookings')!) : []);
-    const bookings = savedBookings || [];
+    const localBookings = bookings && bookings.length > 0 ? bookings : [];
 
     // Calculate active busy keys
-    const activeBookings = bookings.filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
+    const activeBookings = localBookings.filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
     const activeBusyKeys = new Set(
       activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
     );
 
     // 1. Calculate Unit Stats
-    const savedUnits = customUnits || (units.length > 0 ? units : (localStorage.getItem('playbox_mock_units') ? JSON.parse(localStorage.getItem('playbox_mock_units')!) : []));
     let totalU = 0, readyU = 0, disewaU = 0, maintenanceU = 0;
+    
+    // Always fallback to localStorage if units context is empty during hydration
+    const savedUnits = units && units.length > 0 ? units : (localStorage.getItem('playbox_mock_units') ? JSON.parse(localStorage.getItem('playbox_mock_units')!) : []);
     
     if (savedUnits && savedUnits.length > 0) {
       totalU = savedUnits.length;
@@ -122,15 +103,15 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     let pendingTasks: any[] = [];
     let totalRevenue = 0;
 
-    if (bookings && bookings.length > 0) {
-      baruB = bookings.filter((b: any) => b.status === 'Perlu Verifikasi').length;
+    if (localBookings && localBookings.length > 0) {
+      baruB = localBookings.filter((b: any) => b.status === 'Perlu Verifikasi').length;
       
-      let initialPendingTasks = bookings.filter((b: any) => 
+      let initialPendingTasks = localBookings.filter((b: any) => 
         ['Perlu Verifikasi', 'Persiapan', 'Diantar', 'Menunggu Pembayaran'].includes(b.status) || b.needAction === true
       );
 
       const now = new Date();
-      bookings.forEach((b: any) => {
+      localBookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           totalRevenue += (Number(b.totalPrice) || 0);
         }
@@ -201,7 +182,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
       }
       
       let cData = [0, 0, 0, 0, 0, 0, 0];
-      bookings.forEach((b: any) => {
+      localBookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           let bDate: Date | null = null;
           if (b.isoStart || b.startTime) {
@@ -232,7 +213,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
 
       // Calculate Top Units
       const unitStats: Record<string, { count: number, revenue: number, name: string }> = {};
-      bookings.forEach((b: any) => {
+      localBookings.forEach((b: any) => {
         if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
           const key = b.unitId || b.unit;
           if (!unitStats[key]) {
@@ -256,7 +237,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     });
     setTasks(pendingTasks);
     setRevenue(totalRevenue);
-    setRecentBookings([...bookings].slice(0, 3));
+    setRecentBookings([...localBookings].slice(0, 3));
   };
 
   // Calculate percentage change compared to yesterday
@@ -264,11 +245,13 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
   let todayRev = 0;
   let yesterdayRev = 0;
   
-  if (bookings && bookings.length > 0) {
+  const activeLocalBookings = bookings && bookings.length > 0 ? bookings : [];
+
+  if (activeLocalBookings.length > 0) {
     const now = new Date();
     const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
     
-    bookings.forEach((b: any) => {
+    activeLocalBookings.forEach((b: any) => {
       if (b.status === 'Selesai' || b.paymentStatus === 'Lunas') {
         let bDate = new Date();
         if (b.isoStart || b.startTime) bDate = new Date(b.isoStart || b.startTime);
