@@ -358,85 +358,59 @@ export default function DashboardHome() {
             </Link>
           </div>
           
-          {/* 7-Day Smooth SVG Area Chart */}
-          <div className="mt-8 pt-4 relative h-40 w-full mb-6">
-            <svg className="w-full h-full overflow-visible absolute inset-0" preserveAspectRatio="none" viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#bef264" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#bef264" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {/* Area Fill */}
-              <path 
-                d={`${generateSmoothPath(chartData.data, chartData.max)} L 100,100 L 0,100 Z`} 
-                fill="url(#chartGradient)" 
-                className="animate-in fade-in duration-1000"
-              />
-              {/* Line Path */}
-              <path 
-                d={generateSmoothPath(chartData.data, chartData.max)}
-                fill="none" 
-                stroke="#d9f99d" 
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="animate-in fade-in duration-1000 shadow-[0_0_15px_rgba(190,242,100,0.8)]"
-                style={{ filter: 'drop-shadow(0px 0px 4px rgba(217,249,157,0.8))' }}
-              />
-            </svg>
-
-            {/* HTML Overlay for Data Points & Interaction */}
-            <div className="absolute inset-0">
-              {chartData.data.map((val, i) => {
-                const isToday = i === chartData.data.length - 1;
-                const heightPercent = Math.max((val / (chartData.max || 1)) * 100, 5);
-                const leftPercent = (i / (chartData.data.length - 1)) * 100;
-                // Only show dots and lines for non-zero values or just keep them minimal
-                if (val === 0 && !isToday && chartData.max > 0) return null; // hide zero dots for cleaner look unless it's today
-
-                return (
-                  <div 
-                    key={i} 
-                    className="absolute top-0 bottom-0 w-8 -ml-4 flex flex-col items-center justify-end z-10"
-                    style={{ left: `${leftPercent}%` }}
-                  >
-                    {/* Value Text */}
-                    <div 
-                      className={`absolute font-bold whitespace-nowrap drop-shadow-md ${isToday ? 'text-white text-[11px]' : 'text-white/70 text-[9px]'}`}
-                      style={{ bottom: `calc(${heightPercent}% + 8px)` }}
-                    >
-                      {val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
-                    </div>
-                    {/* Dot */}
-                    <div 
-                      className={`rounded-full bg-white z-20 shadow-[0_0_10px_rgba(255,255,255,1)] ${isToday ? 'w-2.5 h-2.5 ring-4 ring-[#bef264]/40' : 'w-1.5 h-1.5'}`}
-                      style={{ marginBottom: `calc(${heightPercent}% - ${isToday ? '5px' : '3px'})` }}
-                    ></div>
-                    {/* Vertical Dashed Line */}
-                    <div 
-                      className="absolute bottom-0 w-px border-l border-dashed border-white/20"
-                      style={{ height: `calc(${heightPercent}% - 5px)` }}
-                    ></div>
-                  </div>
-                );
-              })}
+          {/* Minimalist Smooth SVG Area Chart */}
+          <div className="mt-8 pt-4 flex w-full h-48 mb-2">
+            {/* Y-Axis Labels */}
+            <div className="flex flex-col justify-between items-end pr-4 pb-6 text-[9px] text-white/40 font-medium whitespace-nowrap">
+              <span>Rp {chartData.max.toLocaleString('id-ID')}</span>
+              <span>Rp {(chartData.max * 0.75).toLocaleString('id-ID')}</span>
+              <span>Rp {(chartData.max * 0.5).toLocaleString('id-ID')}</span>
+              <span>Rp {(chartData.max * 0.25).toLocaleString('id-ID')}</span>
+              <span>Rp 0</span>
             </div>
 
-            {/* Labels */}
-            <div className="absolute -bottom-6 left-0 right-0 pointer-events-none">
-              {chartData.labels.map((lbl, idx) => {
-                const leftPercent = (idx / (chartData.labels.length - 1)) * 100;
-                return (
-                  <span 
-                    key={idx} 
-                    className={`absolute text-[9px] font-semibold text-center w-6 -ml-3 ${idx === 6 ? 'text-white' : 'text-white/40'}`}
-                    style={{ left: `${leftPercent}%` }}
-                  >
-                    {lbl}
-                  </span>
-                );
-              })}
+            {/* Chart Area */}
+            <div className="flex-1 relative h-full pb-6">
+              <svg className="w-full h-full overflow-visible absolute inset-0" preserveAspectRatio="none" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {/* Area Fill */}
+                <path 
+                  d={`${generateSmoothPath(chartData.data, chartData.max)} L 100,100 L 0,100 Z`} 
+                  fill="url(#chartGradient)" 
+                  className="animate-in fade-in duration-1000"
+                />
+                {/* Line Path */}
+                <path 
+                  d={generateSmoothPath(chartData.data, chartData.max)}
+                  fill="none" 
+                  stroke="#34d399" 
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="animate-in fade-in duration-1000 drop-shadow-md"
+                />
+              </svg>
+
+              {/* X-Axis Labels */}
+              <div className="absolute bottom-0 translate-y-full left-0 right-0 pointer-events-none h-6 mt-2">
+                {chartData.labels.map((lbl, idx) => {
+                  const leftPercent = (idx / (chartData.labels.length - 1)) * 100;
+                  return (
+                    <span 
+                      key={idx} 
+                      className={`absolute text-[9px] font-medium text-center w-8 -ml-4 ${idx === 6 ? 'text-white' : 'text-white/40'}`}
+                      style={{ left: `${leftPercent}%`, top: '8px' }}
+                    >
+                      {lbl}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
