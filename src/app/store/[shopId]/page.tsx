@@ -12,6 +12,7 @@ import { toPng } from 'html-to-image';
 export default function StorefrontPage({ params }: { params: Promise<{ shopId: string }> }) {
   const router = useRouter();
   const unwrappedParams = use(params);
+  const [isLoading, setIsLoading] = useState(true);
   const [units, setUnits] = useState<any[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [selectedTierIndex, setSelectedTierIndex] = useState(0);
@@ -454,6 +455,14 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
           )}
         </div>
       </header>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="fixed inset-0 z-50 bg-[#0E1221] flex flex-col items-center justify-center">
+          <div className="w-12 h-12 border-4 border-playbox-accent/30 border-t-playbox-accent rounded-full animate-spin mb-4"></div>
+          <p className="text-white/60 text-sm font-medium animate-pulse">Memuat katalog PlayStation...</p>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="relative z-10 max-w-lg mx-auto p-4 space-y-5 pb-24">
