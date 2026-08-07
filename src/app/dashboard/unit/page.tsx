@@ -28,9 +28,11 @@ export default function UnitList() {
     }
 
     // 1. Live state for active bookings
-    let activeBusyKeys = new Set<string>();
+    let cachedActiveBookings: any[] = [];
 
     const applyStatusUpdate = (rawUnits: any[]) => {
+      const now = Date.now();
+      
       return rawUnits.map(u => {
         if (u.status === 'Maintenance') {
           return {
@@ -38,13 +40,38 @@ export default function UnitList() {
             statusColor: 'bg-playbox-maintenance/10 text-playbox-maintenance border border-playbox-maintenance/20'
           };
         }
-        const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name) || u.status === 'Disewa' || u.status === 'Sedang Dipakai';
+        
+        const unitBookings = cachedActiveBookings.filter(b => b.unitId === u.id || b.unit === u.name);
+        
+        let isCurrentlyBusy = false;
+        let nextBooking = null;
+        let nextBookingStartMs = Infinity;
+
+        unitBookings.forEach(b => {
+          const startMs = b.isoStart ? new Date(b.isoStart).getTime() : 
+                         (b.startTime ? new Date(`${b.startDate || ''} ${b.startTime}`).getTime() : 0);
+          const durHours = Number(b.durationHours || b.duration || 24);
+          const endMs = b.isoEnd ? new Date(b.isoEnd).getTime() : startMs + (durHours * 60 * 60 * 1000);
+
+          if (now >= startMs && now <= endMs) {
+            isCurrentlyBusy = true;
+          } else if (startMs > now && startMs < nextBookingStartMs) {
+            nextBooking = b;
+            nextBookingStartMs = startMs;
+          }
+        });
+
+        // If the admin manually set status to Disewa in Firestore, we still respect it as a fallback, 
+        // but only if it's not dynamically ready. (However, we stopped doing that in verify page).
+        const finalIsBusy = isCurrentlyBusy || u.status === 'Sedang Dipakai';
+
         return {
           ...u,
-          status: isBusy ? 'Disewa' : (u.status || 'Ready'),
-          statusColor: isBusy 
+          status: finalIsBusy ? 'Disewa' : 'Ready',
+          statusColor: finalIsBusy 
             ? 'bg-playbox-disewa/10 text-playbox-disewa border border-playbox-disewa/20' 
-            : 'bg-playbox-ready/10 text-playbox-ready border border-playbox-ready/20'
+            : 'bg-playbox-ready/10 text-playbox-ready border border-playbox-ready/20',
+          nextBooking: !finalIsBusy && nextBooking ? nextBooking : null
         };
       });
     };
@@ -92,10 +119,7 @@ export default function UnitList() {
         .map(d => d.data())
         .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
       
-      activeBusyKeys = new Set(
-        activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
-      );
-
+      cachedActiveBookings = activeBookings;
       setUnits(prev => applyStatusUpdate(prev));
     }, (err) => {
       console.warn('Unit bookings listener err:', err);
@@ -225,6 +249,18 @@ export default function UnitList() {
                       + {unit.games.length - 3} lainnya
                     </span>
                   )}
+                </div>
+              )}
+
+              {unit.nextBooking && (
+                <div className="mt-3 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-xl flex items-start gap-2 shadow-inner">
+                  <span className="text-yellow-500 text-xs shrink-0 mt-0.5">⚠️</span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider mb-0.5">Akan Disewa: {unit.nextBooking.customer}</p>
+                    <p className="text-[10px] font-medium text-yellow-500/80 truncate">
+                      🗓️ {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB
+                    </p>
+                  </div>
                 </div>
               )}
               

@@ -79,11 +79,22 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
     // 2. Load Bookings
     const localBookings = bookings && bookings.length > 0 ? bookings : [];
 
-    // Calculate active busy keys
+    // Calculate active busy keys based on REAL TIME overlaps
     const activeBookings = localBookings.filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
-    const activeBusyKeys = new Set(
-      activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
-    );
+    const nowMs = currentTime.getTime();
+    
+    const activeBusyKeys = new Set<string>();
+    activeBookings.forEach((b: any) => {
+      const startMs = b.isoStart ? new Date(b.isoStart).getTime() : 
+                     (b.startTime ? new Date(`${b.startDate || ''} ${b.startTime}`).getTime() : 0);
+      const durHours = Number(b.durationHours || b.duration || 24);
+      const endMs = b.isoEnd ? new Date(b.isoEnd).getTime() : startMs + (durHours * 60 * 60 * 1000);
+
+      if (nowMs >= startMs && nowMs <= endMs) {
+        if (b.unitId) activeBusyKeys.add(b.unitId);
+        if (b.unit) activeBusyKeys.add(b.unit);
+      }
+    });
 
     // 1. Calculate Unit Stats
     let totalU = 0, readyU = 0, disewaU = 0, maintenanceU = 0;
@@ -97,7 +108,8 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
         if (u.status === 'Maintenance') {
           maintenanceU++;
         } else {
-          const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name) || u.status === 'Disewa' || u.status === 'Sedang Dipakai';
+          // Fallback to u.status === 'Sedang Dipakai' only if it was manually set
+          const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name) || u.status === 'Sedang Dipakai';
           if (isBusy) disewaU++;
           else readyU++;
         }
