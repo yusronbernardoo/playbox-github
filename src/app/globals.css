@@ -4,10 +4,10 @@
   --color-bg: #03040B; /* Slightly deeper black */
   --color-surface: #0E1221;
   --color-surface-elevated: #161C33;
-  --color-accent: #E2178E; /* More vibrant pink/magenta */
-  --color-accent-hover: #F0289D;
-  --color-accent-gradient-start: #5912C0;
-  --color-accent-gradient-end: #CC1288;
+  --color-accent: #2563EB; /* Vibrant Blue */
+  --color-accent-hover: #3B82F6; /* Lighter Blue */
+  --color-accent-gradient-start: #1E3A8A; /* Dark Blue */
+  --color-accent-gradient-end: #2563EB; /* Vibrant Blue */
   --color-status-ready: #23C552;
   --color-status-disewa: #E2178E;
   --color-status-maintenance: #F5A623;

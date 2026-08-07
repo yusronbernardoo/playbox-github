@@ -38,12 +38,14 @@ export default function LoginPage() {
         <div className="absolute -inset-0.5 bg-gradient-to-br from-playbox-gradient-start/30 to-playbox-gradient-end/30 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity duration-1000 blur-xl -z-10"></div>
         
         <div className="text-center mb-8 relative z-10">
-          <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-playbox-gradient-start to-playbox-gradient-end flex items-center justify-center text-4xl font-black text-white shadow-[0_0_40px_rgba(226,23,142,0.3)] mb-6 relative group-hover:scale-105 transition-transform duration-500">
-            <div className="absolute inset-0 rounded-3xl border border-white/20"></div>
-            P
+          <div className="mx-auto w-32 h-20 mb-4 relative flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+            <img 
+              src="/renterva-logo.png" 
+              alt="Renterva Play Logo" 
+              className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+            />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tighter mb-1.5 drop-shadow-sm">PLAYBOX</h1>
-          <p className="text-xs text-playbox-text-secondary font-medium tracking-wide uppercase">OS / Manajemen Rental</p>
+          <p className="text-xs text-playbox-text-secondary font-medium tracking-wide">Atur Booking PS Tanpa Ribet.</p>
         </div>
 
         {error && (
