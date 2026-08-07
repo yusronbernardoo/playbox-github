@@ -145,22 +145,36 @@ export default function BookingList() {
           let timerBadge = null;
           if (rawEnd && booking.status !== 'Selesai' && booking.status !== 'Perlu Verifikasi') {
             const endMs = new Date(rawEnd).getTime();
-            const diff = endMs - now;
-            if (diff <= 0) {
-              const lateHours = Math.max(1, Math.ceil(Math.abs(diff) / (1000 * 60 * 60)));
+            const startMs = booking.isoStart ? new Date(booking.isoStart).getTime() : 
+                           (booking.startTime ? new Date(`${booking.startDate || ''} ${booking.startTime}`).getTime() : 0);
+            
+            if (startMs && now < startMs) {
+              const diffToStart = startMs - now;
+              const h = Math.floor(diffToStart / (1000 * 60 * 60));
+              const m = Math.floor((diffToStart % (1000 * 60 * 60)) / (1000 * 60));
               timerBadge = (
-                <span className="bg-red-500 text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(239,68,68,0.6)] animate-pulse">
-                  🚨 Telat {lateHours} Jam!
+                <span className="bg-yellow-500 text-black text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(234,179,8,0.6)]">
+                  ⏳ Mulai: {h}J {m}M
                 </span>
               );
             } else {
-              const h = Math.floor(diff / (1000 * 60 * 60));
-              const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-              timerBadge = (
-                <span className="bg-playbox-accent text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(37,99,235,0.6)]">
-                  ⏱️ Sisa: {h} Jam {m} Mnt
-                </span>
-              );
+              const diff = endMs - now;
+              if (diff <= 0) {
+                const lateHours = Math.max(1, Math.ceil(Math.abs(diff) / (1000 * 60 * 60)));
+                timerBadge = (
+                  <span className="bg-red-500 text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(239,68,68,0.6)] animate-pulse">
+                    🚨 Telat {lateHours} Jam!
+                  </span>
+                );
+              } else {
+                const h = Math.floor(diff / (1000 * 60 * 60));
+                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                timerBadge = (
+                  <span className="bg-playbox-accent text-white text-[9px] px-2.5 py-0.5 rounded-full font-bold shadow-[0_2px_10px_rgba(37,99,235,0.6)]">
+                    ⏱️ Sisa: {h}J {m}M
+                  </span>
+                );
+              }
             }
           }
                const getBadgeStyle = (status: string) => {

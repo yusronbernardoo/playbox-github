@@ -209,9 +209,21 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       const activeBookings = snapshot.docs.map(doc => doc.data());
       setActiveBookingsList(activeBookings);
       
-      activeBusyKeys = new Set(
-        activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
-      );
+      const now = Date.now();
+      const busySet = new Set<string>();
+      
+      activeBookings.forEach((b: any) => {
+          const startMs = b.isoStart ? new Date(b.isoStart).getTime() : 
+                         (b.startTime ? new Date(`${b.startDate || ''} ${b.startTime}`).getTime() : 0);
+          const durationHours = Number(b.durationHours || b.duration || 24);
+          const endMs = b.isoEnd ? new Date(b.isoEnd).getTime() : startMs + (durationHours * 60 * 60 * 1000);
+          
+          if (now >= startMs && now <= endMs) {
+             if (b.unitId) busySet.add(b.unitId);
+             if (b.unit) busySet.add(b.unit);
+          }
+      });
+      activeBusyKeys = busySet;
 
       if (rawUnitsList.length > 0) {
         setUnits(updateCombinedUnits(rawUnitsList));
@@ -291,6 +303,34 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       alert('Mohon pilih tanggal dan jam mulai sewa!');
       return;
     }
+
+    // --- CONFLICT CHECKER ---
+    const checkActiveHours = getTierHours(activeTier);
+    const checkFormattedDate = format(new Date(startDate), 'yyyy-MM-dd');
+    const checkIsoStart = `${checkFormattedDate}T${startTime}:00`;
+    const reqStartMs = new Date(checkIsoStart).getTime();
+    const reqEndMs = reqStartMs + (checkActiveHours * 60 * 60 * 1000);
+
+    const isConflict = activeBookingsList.some(b => {
+      if (b.unitId !== selectedUnit.id && b.unit !== selectedUnit.name) return false;
+      
+      const bStartMs = b.isoStart ? new Date(b.isoStart).getTime() : 
+                     (b.startTime ? new Date(`${b.startDate || ''} ${b.startTime}`).getTime() : 0);
+      const bDurationHours = Number(b.durationHours || b.duration || 24);
+      const bEndMs = b.isoEnd ? new Date(b.isoEnd).getTime() : bStartMs + (bDurationHours * 60 * 60 * 1000);
+      
+      // Toleransi persiapan/cleaning (1 jam)
+      const paddedBEndMs = bEndMs + (1 * 60 * 60 * 1000);
+      
+      // Rumus Overlap: (StartA <= EndB) AND (StartB <= EndA)
+      return reqStartMs <= paddedBEndMs && bStartMs <= reqEndMs;
+    });
+
+    if (isConflict) {
+      alert('⚠️ Maaf, jadwal bertabrakan! Unit ini sudah dibooking pelanggan lain pada tanggal & jam tersebut. Mohon pilih waktu atau unit yang lain.');
+      return;
+    }
+    // ------------------------
 
     setIsSubmitting(true);
 
