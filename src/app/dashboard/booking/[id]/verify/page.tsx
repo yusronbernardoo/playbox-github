@@ -601,7 +601,7 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
       )}
 
       {/* Floating Action Buttons */}
-      <div className="fixed bottom-[72px] w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 z-40">
+      <div className="fixed bottom-0 pb-6 w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 z-[60]">
         <div className="flex space-x-3 max-w-md mx-auto">
           {booking.status === 'Perlu Verifikasi' ? (
             <>

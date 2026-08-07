@@ -254,7 +254,6 @@ export default function NewBooking() {
         code: 'PBX-' + Math.floor(10000 + Math.random() * 90000), // e.g. PBX-12345
         customer: customer.name,
         customerPhone: customer.phone,
-        guaranteeType: customer.guaranteeType,
         unit: selectedUnit.name,
         unitId: selectedUnit.id,
         time: `${schedule.date}, ${schedule.time} (${schedule.duration} ${schedule.durationType})`,
@@ -652,21 +651,6 @@ export default function NewBooking() {
                 )}
               </div>
               
-              <div>
-                <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Jaminan Identitas</label>
-                <select 
-                  value={customer.guaranteeType}
-                  onChange={(e) => setCustomer({...customer, guaranteeType: e.target.value})}
-                  className="w-full p-4 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent appearance-none"
-                >
-                  <option value="KTP">KTP Asli</option>
-                  <option value="SIM">SIM Asli</option>
-                  <option value="Kartu Pelajar">Kartu Pelajar / Mahasiswa Asli</option>
-                  <option value="BPKB">BPKB Asli</option>
-                  <option value="Lainnya">Lainnya</option>
-                </select>
-                <p className="text-[10px] text-playbox-text-secondary mt-1 ml-1">Sistem akan mengingatkan Anda untuk mengembalikan ini saat unit dikembalikan.</p>
-              </div>
               <div>
                 <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">No HP Darurat (Wajib)</label>
                 <input 

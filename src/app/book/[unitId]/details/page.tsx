@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function CustomerDetails() {
   const router = useRouter();
@@ -11,10 +13,50 @@ export default function CustomerDetails() {
     requireDelivery: false,
     address: ''
   });
+  const [ktpFile, setKtpFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate booking creation
+    if (!formData.phone) return alert('Nomor WhatsApp wajib diisi');
+    
+    setIsSubmitting(true);
+    
+    // 1. Cek Blacklist
+    try {
+      const phoneNum = formData.phone.replace(/\D/g, '');
+      const custDoc = await getDoc(doc(db, 'customers', phoneNum));
+      if (custDoc.exists() && custDoc.data().isBlacklisted) {
+        setIsSubmitting(false);
+        return alert(`Maaf, Anda tidak dapat melakukan pemesanan saat ini. Silakan hubungi admin toko. \n\nAlasan: ${custDoc.data().blacklistReason || 'Pelanggaran ketentuan'}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    
+    // 2. Buat simulasi booking agar muncul di Dashboard Admin
+    const saved = localStorage.getItem('playbox_mock_bookings');
+    const bookings = saved ? JSON.parse(saved) : [];
+    
+    const newBooking = {
+      id: 'B' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'),
+      code: 'PBX-ONLINE' + Math.floor(1000 + Math.random() * 9000),
+      customer: formData.name,
+      customerPhone: formData.phone,
+      unit: 'PS5 Premium Set',
+      unitId: 'PS5-001',
+      time: '17 Agustus 2026, 10:00 (24 Jam)',
+      status: 'Menunggu Pembayaran',
+      statusColor: 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20',
+      needAction: true,
+      totalPrice: formData.requireDelivery ? 200000 : 150000,
+      documents: ktpFile ? [{ title: 'KTP (Online)', file: URL.createObjectURL(ktpFile) }] : []
+    };
+    
+    bookings.push(newBooking);
+    localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
+
+    setIsSubmitting(false);
     router.push('/book/success');
   };
 
@@ -71,7 +113,8 @@ export default function CustomerDetails() {
           </div>
           <div>
             <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5">Foto KTP (Opsional)</label>
-            <input type="file" accept="image/*" className="w-full text-sm text-playbox-text-secondary file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-white/10 file:text-white hover:file:bg-white/20 transition-colors" />
+            <input type="file" accept="image/*" onChange={e => setKtpFile(e.target.files?.[0] || null)} className="w-full text-sm text-playbox-text-secondary file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-white/10 file:text-white hover:file:bg-white/20 transition-colors" />
+            <p className="text-[10px] text-playbox-text-secondary mt-1">Digunakan untuk keperluan jaminan peminjaman.</p>
           </div>
         </div>
 
@@ -136,9 +179,10 @@ export default function CustomerDetails() {
         <div className="mt-auto pt-6 pb-8">
           <button 
             type="submit" 
-            className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white hover:scale-[1.02] transition-all shadow-[0_4px_15px_rgba(37,99,235,0.4)]"
+            disabled={isSubmitting}
+            className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white hover:scale-[1.02] transition-all shadow-[0_4px_15px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:hover:scale-100"
           >
-            Selesaikan Booking
+            {isSubmitting ? 'Memproses...' : 'Selesaikan Booking'}
           </button>
         </div>
       </form>

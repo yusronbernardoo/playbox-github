@@ -338,14 +338,14 @@ export default function ReturnCheck() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-[72px] w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-playbox-bg/80 backdrop-blur-xl border-t border-white/5 z-40">
+      <div className="fixed bottom-0 pb-6 w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-playbox-bg/95 backdrop-blur-xl border-t border-white/10 z-[60]">
         <div className="max-w-md mx-auto space-y-3">
-          {bookingData?.guaranteeType && (
+          {bookingData?.documents && bookingData.documents.length > 0 && (
             <div className="bg-yellow-500/20 border border-yellow-500/50 p-3 rounded-xl flex items-start space-x-3 shadow-[0_0_15px_rgba(234,179,8,0.2)] animate-pulse">
               <svg className="w-6 h-6 text-yellow-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               <div>
                 <p className="text-yellow-500 font-bold text-sm">PENGEMBALIAN JAMINAN</p>
-                <p className="text-yellow-500/90 text-[11px] mt-0.5 leading-tight">Jangan lupa kembalikan <span className="font-bold text-white bg-yellow-500/30 px-1 rounded">{bookingData.guaranteeType}</span> milik pelanggan sebelum menekan tombol Selesai!</p>
+                <p className="text-yellow-500/90 text-[11px] mt-0.5 leading-tight">Jangan lupa kembalikan dokumen: <span className="font-bold text-white bg-yellow-500/30 px-1 rounded">{bookingData.documents.map((d: any) => d.title).join(', ')}</span> milik pelanggan sebelum menekan tombol Selesai!</p>
               </div>
             </div>
           )}
