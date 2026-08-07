@@ -176,9 +176,7 @@ export default function BookingList() {
           <Link href={booking.needAction ? `/dashboard/booking/${booking.id}/verify` : `/dashboard/booking/${booking.id}/timeline`} className="absolute inset-0 z-0"></Link>
           
           <div className="relative z-10 pointer-events-none">
-            {booking.needAction && (
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
-            )}
+            {/* Redundant yellow bar removed */}
             
             <div className="flex justify-between items-start gap-3 mb-3 pointer-events-auto">
               <div className="min-w-0 flex-1">

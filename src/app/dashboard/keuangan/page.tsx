@@ -576,8 +576,8 @@ export default function Keuangan() {
 
       {/* Modal Date Picker */}
       {showDatePicker && (
-        <div className="fixed inset-0 bg-black/70 max-w-md mx-auto backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-100 transition-opacity">
-          <div className="glass-surface-elevated w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95 border border-white/10">
+        <div className="fixed inset-0 bg-black/70 max-w-md mx-auto backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-100 transition-opacity">
+          <div className="glass-surface-elevated w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 pb-12 sm:pb-6 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95 border border-white/10">
             <div className="flex justify-between items-center mb-5">
               <h2 className="font-bold text-base tracking-tight text-white">Pilih Tanggal</h2>
               <button onClick={() => setShowDatePicker(false)} className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors text-xs">✕</button>
