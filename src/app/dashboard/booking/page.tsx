@@ -229,8 +229,8 @@ export default function BookingList() {
                   <span className="flex-1 leading-snug truncate">{booking.requireDelivery ? `Diantar: ${booking.deliveryAddress || booking.address || '-'}` : 'Ambil di Toko (Mandiri)'}</span>
                 </p>
               </div>
-            </div>             </div>
-              </div>
+            </div>
+          </div>
 
               {booking.needAction ? (
                 <div className="flex space-x-3 border-t border-white/10 pt-4">
