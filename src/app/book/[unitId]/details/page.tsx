@@ -10,9 +10,35 @@ export default function CustomerDetails() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    instagram: '',
+    emergencyPhone: '',
     requireDelivery: false,
     address: ''
   });
+  const [ktpFile, setKtpFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [blacklistedCustomer, setBlacklistedCustomer] = useState<{isBlacklisted: boolean, blacklistReason?: string} | null>(null);
+
+  const checkBlacklist = async (phone: string) => {
+    if (!phone) {
+      setBlacklistedCustomer(null);
+      return;
+    }
+    try {
+      const phoneNum = phone.replace(/\D/g, '');
+      const custDoc = await getDoc(doc(db, 'customers', phoneNum));
+      if (custDoc.exists() && custDoc.data().isBlacklisted) {
+        setBlacklistedCustomer({
+          isBlacklisted: true,
+          blacklistReason: custDoc.data().blacklistReason
+        });
+      } else {
+        setBlacklistedCustomer(null);
+      }
+    } catch (e) {
+      console.error('Error checking blacklist:', e);
+    }
+  };
   const [ktpFile, setKtpFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -22,16 +48,9 @@ export default function CustomerDetails() {
     
     setIsSubmitting(true);
     
-    // 1. Cek Blacklist
-    try {
-      const phoneNum = formData.phone.replace(/\D/g, '');
-      const custDoc = await getDoc(doc(db, 'customers', phoneNum));
-      if (custDoc.exists() && custDoc.data().isBlacklisted) {
-        setIsSubmitting(false);
-        return alert(`Maaf, Anda tidak dapat melakukan pemesanan saat ini. Silakan hubungi admin toko. \n\nAlasan: ${custDoc.data().blacklistReason || 'Pelanggaran ketentuan'}`);
-      }
-    } catch (e) {
-      console.error(e);
+    if (blacklistedCustomer) {
+      setIsSubmitting(false);
+      return alert(`Maaf, Anda tidak dapat melakukan pemesanan saat ini. \n\nAlasan: ${blacklistedCustomer.blacklistReason || 'Pelanggaran ketentuan'}`);
     }
     
     // 2. Buat simulasi booking agar muncul di Dashboard Admin
@@ -43,6 +62,8 @@ export default function CustomerDetails() {
       code: 'PBX-ONLINE' + Math.floor(1000 + Math.random() * 9000),
       customer: formData.name,
       customerPhone: formData.phone,
+      instagram: formData.instagram,
+      emergencyPhone: formData.emergencyPhone,
       unit: 'PS5 Premium Set',
       unitId: 'PS5-001',
       time: '17 Agustus 2026, 10:00 (24 Jam)',
@@ -109,7 +130,35 @@ export default function CustomerDetails() {
           </div>
           <div>
             <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5">Nomor WhatsApp Aktif</label>
-            <input type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3.5 rounded-xl bg-black/20 border border-white/10 text-white focus:border-playbox-accent transition-colors" required placeholder="08xxxxxxxxxx" />
+            <input 
+              type="tel" 
+              value={formData.phone} 
+              onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})}
+              onBlur={e => checkBlacklist(e.target.value)}
+              className={`w-full p-3.5 rounded-xl bg-black/20 border text-white transition-colors ${blacklistedCustomer ? 'border-red-500 focus:border-red-500 bg-red-500/5' : 'border-white/10 focus:border-playbox-accent'}`} 
+              required 
+              placeholder="08xxxxxxxxxx" 
+            />
+            {blacklistedCustomer && (
+              <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start space-x-2">
+                <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <div>
+                  <p className="text-red-500 font-bold text-xs">TOLAK PESANAN! Anda masuk daftar Blacklist</p>
+                  <p className="text-red-400 text-[10px] mt-0.5">Alasan: {blacklistedCustomer.blacklistReason || 'Tidak diketahui'}</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5">Username Instagram</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40">@</span>
+              <input type="text" value={formData.instagram} onChange={e => setFormData({...formData, instagram: e.target.value})} className="w-full p-3.5 pl-8 rounded-xl bg-black/20 border border-white/10 text-white focus:border-playbox-accent transition-colors" required placeholder="username_ig" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5">No. HP Darurat (Keluarga/Teman)</label>
+            <input type="tel" value={formData.emergencyPhone} onChange={e => setFormData({...formData, emergencyPhone: e.target.value.replace(/\D/g, '')})} className="w-full p-3.5 rounded-xl bg-black/20 border border-white/10 text-white focus:border-playbox-accent transition-colors" required placeholder="08xxxxxxxxxx" />
           </div>
           <div>
             <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5">Foto KTP (Opsional)</label>
@@ -179,8 +228,12 @@ export default function CustomerDetails() {
         <div className="mt-auto pt-6 pb-8">
           <button 
             type="submit" 
-            disabled={isSubmitting}
-            className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white hover:scale-[1.02] transition-all shadow-[0_4px_15px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:hover:scale-100"
+            disabled={isSubmitting || blacklistedCustomer !== null}
+            className={`w-full py-4 rounded-xl font-bold transition-all shadow-[0_4px_15px_rgba(37,99,235,0.4)] ${
+              blacklistedCustomer !== null 
+                ? 'bg-white/5 text-white/30 cursor-not-allowed shadow-none border border-white/5' 
+                : 'bg-gradient-to-r from-playbox-gradient-start to-playbox-accent text-white hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100'
+            }`}
           >
             {isSubmitting ? 'Memproses...' : 'Selesaikan Booking'}
           </button>
