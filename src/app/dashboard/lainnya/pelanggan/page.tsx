@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 
@@ -50,6 +50,58 @@ export default function PelangganPage() {
     setIsLoading(false);
   };
 
+  const handleSyncData = async () => {
+    const confirmSync = confirm("Sinkronisasi akan mengecek semua riwayat pesanan (termasuk yang lama) dan mendaftarkannya ke Database Pelanggan. Lanjutkan?");
+    if (!confirmSync) return;
+    
+    setIsLoading(true);
+    try {
+      const savedBookings = localStorage.getItem('playbox_mock_bookings');
+      if (savedBookings) {
+        const bookings = JSON.parse(savedBookings);
+        const customerMap = new Map();
+        
+        for (const b of bookings) {
+          if (!b.customerPhone) continue;
+          const phone = b.customerPhone.replace(/\D/g, '');
+          if (phone.length < 10) continue;
+          
+          if (!customerMap.has(phone)) {
+            customerMap.set(phone, {
+              name: b.customer,
+              phone: phone,
+              totalBookings: 1,
+              totalSpent: Number(b.totalPrice || 0)
+            });
+          } else {
+            const existing = customerMap.get(phone);
+            existing.totalBookings += 1;
+            existing.totalSpent += Number(b.totalPrice || 0);
+          }
+        }
+        
+        for (const [phone, data] of customerMap.entries()) {
+          const docRef = doc(db, 'customers', phone);
+          const snap = await getDoc(docRef);
+          if (!snap.exists()) {
+             await setDoc(docRef, {
+               ...data,
+               isBlacklisted: false,
+               blacklistReason: ''
+             });
+          }
+        }
+        
+        alert("Sinkronisasi berhasil! Data pelanggan lama telah dimasukkan.");
+        await loadCustomers();
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Gagal melakukan sinkronisasi data.");
+    }
+    setIsLoading(false);
+  };
+
   const handleToggleBlacklist = (c: any) => {
     setSelectedCustomer(c);
     setBlacklistReason(c.blacklistReason || '');
@@ -90,14 +142,29 @@ export default function PelangganPage() {
     <div className="p-4 pb-28 min-h-screen flex flex-col relative">
       <div className="ambient-glow"></div>
 
-      <div className="flex items-center mt-2 mb-6 relative z-10">
-        <button onClick={() => router.back()} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-xl mr-4 hover:bg-white/10 transition-colors">
-          ←
-        </button>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Database Pelanggan</h1>
-          <p className="text-xs text-playbox-text-secondary">CRM & Manajemen Blacklist</p>
+      <div className="flex items-center justify-between mt-2 mb-6 relative z-10">
+        <div className="flex items-center">
+          <button onClick={() => router.back()} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-xl mr-4 hover:bg-white/10 transition-colors">
+            ←
+          </button>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Database Pelanggan</h1>
+            <p className="text-xs text-playbox-text-secondary">CRM & Manajemen Blacklist</p>
+          </div>
         </div>
+        
+        {customers.length > 0 && (
+          <button 
+            onClick={handleSyncData}
+            disabled={isLoading}
+            className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/5 flex items-center justify-center disabled:opacity-50"
+            title="Sinkronkan data lama"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="mb-4 relative z-10">
@@ -115,7 +182,13 @@ export default function PelangganPage() {
           <div className="text-center py-10 text-playbox-text-secondary">Memuat data pelanggan...</div>
         ) : filteredCustomers.length === 0 ? (
           <div className="text-center py-10 text-playbox-text-secondary bg-playbox-surface rounded-2xl border border-white/5 p-4">
-            Belum ada data pelanggan yang tersimpan. Data akan bertambah saat pesanan baru dibuat.
+            <p className="mb-4">Belum ada data pelanggan yang tersimpan. Data akan bertambah otomatis saat pesanan baru dibuat.</p>
+            <button 
+              onClick={handleSyncData}
+              className="px-4 py-2 bg-playbox-accent hover:bg-playbox-accent-hover text-white rounded-xl font-bold text-xs transition-colors"
+            >
+              Sinkronkan Data Lama
+            </button>
           </div>
         ) : (
           filteredCustomers.map(c => (

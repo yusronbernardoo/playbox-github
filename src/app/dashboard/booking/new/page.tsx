@@ -254,6 +254,7 @@ export default function NewBooking() {
         code: 'PBX-' + Math.floor(10000 + Math.random() * 90000), // e.g. PBX-12345
         customer: customer.name,
         customerPhone: customer.phone,
+        guaranteeType: customer.guaranteeType,
         unit: selectedUnit.name,
         unitId: selectedUnit.id,
         time: `${schedule.date}, ${schedule.time} (${schedule.duration} ${schedule.durationType})`,
