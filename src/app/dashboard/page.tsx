@@ -67,23 +67,38 @@ export default function DashboardHome() {
   }, [bookings]);
 
   const loadDashboardData = (customBookings?: any[], customUnits?: any[]) => {
+    // 2. Load Bookings
+    const savedBookings = customBookings || (localStorage.getItem('playbox_mock_bookings') ? JSON.parse(localStorage.getItem('playbox_mock_bookings')!) : []);
+    const bookings = savedBookings || [];
+
+    // Calculate active busy keys
+    const activeBookings = bookings.filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
+    const activeBusyKeys = new Set(
+      activeBookings.flatMap((b: any) => [b.unitId, b.unit].filter(Boolean))
+    );
+
     // 1. Calculate Unit Stats
     const savedUnits = customUnits || (localStorage.getItem('playbox_mock_units') ? JSON.parse(localStorage.getItem('playbox_mock_units')!) : []);
     let totalU = 0, readyU = 0, disewaU = 0, maintenanceU = 0;
+    
     if (savedUnits && savedUnits.length > 0) {
       totalU = savedUnits.length;
-      readyU = savedUnits.filter((u: any) => u.status === 'Ready').length;
-      disewaU = savedUnits.filter((u: any) => u.status === 'Disewa').length;
-      maintenanceU = savedUnits.filter((u: any) => u.status === 'Maintenance').length;
+      savedUnits.forEach((u: any) => {
+        if (u.status === 'Maintenance') {
+          maintenanceU++;
+        } else {
+          const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
+          if (isBusy) disewaU++;
+          else readyU++;
+        }
+      });
     }
 
-    // 2. Calculate Booking & Financial Stats
-    const savedBookings = customBookings || (localStorage.getItem('playbox_mock_bookings') ? JSON.parse(localStorage.getItem('playbox_mock_bookings')!) : []);
+    // 3. Calculate Booking & Financial Stats
     let baruB = 0;
     let pendingTasks: any[] = [];
     let totalRevenue = 0;
 
-    const bookings = savedBookings || [];
     if (bookings && bookings.length > 0) {
       baruB = bookings.filter((b: any) => b.status === 'Perlu Verifikasi').length;
       
