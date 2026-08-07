@@ -38,7 +38,7 @@ export default function UnitList() {
             statusColor: 'bg-playbox-maintenance/10 text-playbox-maintenance border border-playbox-maintenance/20'
           };
         }
-        const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name);
+        const isBusy = activeBusyKeys.has(u.id) || activeBusyKeys.has(u.name) || u.status === 'Disewa' || u.status === 'Sedang Dipakai';
         return {
           ...u,
           status: isBusy ? 'Disewa' : (u.status || 'Ready'),

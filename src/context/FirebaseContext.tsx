@@ -12,6 +12,7 @@ interface Booking {
 interface FirebaseContextType {
   bookings: Booking[];
   shopInfo: any;
+  units: any[];
   newBookingToast: Booking | null;
   clearToast: () => void;
   isLoading: boolean;
@@ -20,6 +21,7 @@ interface FirebaseContextType {
 const FirebaseContext = createContext<FirebaseContextType>({
   bookings: [],
   shopInfo: null,
+  units: [],
   newBookingToast: null,
   clearToast: () => {},
   isLoading: true,
@@ -30,6 +32,7 @@ export const useFirebase = () => useContext(FirebaseContext);
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [shopInfo, setShopInfo] = useState<any>(null);
+  const [units, setUnits] = useState<any[]>([]);
   const [newBookingToast, setNewBookingToast] = useState<Booking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadRef = useRef(true);
@@ -87,16 +90,30 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
+      const cloudUnits: any[] = [];
+      snapshot.forEach((docSnap) => {
+        cloudUnits.push({ ...docSnap.data(), id: docSnap.id });
+      });
+      setUnits(cloudUnits);
+      localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+    }, (error) => {
+      console.warn('Firestore units error:', error);
+      const saved = localStorage.getItem('playbox_mock_units');
+      if (saved) setUnits(JSON.parse(saved));
+    });
+
     return () => {
       unsubscribeBookings();
       unsubscribeShop();
+      unsubscribeUnits();
     };
   }, []);
 
   const clearToast = () => setNewBookingToast(null);
 
   return (
-    <FirebaseContext.Provider value={{ bookings, shopInfo, newBookingToast, clearToast, isLoading }}>
+    <FirebaseContext.Provider value={{ bookings, shopInfo, units, newBookingToast, clearToast, isLoading }}>
       {children}
     </FirebaseContext.Provider>
   );

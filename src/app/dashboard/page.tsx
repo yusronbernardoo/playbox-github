@@ -26,8 +26,8 @@ const generateSmoothPath = (data: number[], max: number) => {
   return path;
 };
 
-export default function DashboardHome() {
-  const { bookings, shopInfo } = useFirebase();
+export default function DashboardHome({ customUnits }: { customUnits?: any[] }) {
+  const { bookings, shopInfo, units } = useFirebase();
   const [greeting, setGreeting] = useState("Halo");
   const [businessName, setBusinessName] = useState("PlayBox Malang");
   const [shopLogo, setShopLogo] = useState<string>("");
@@ -86,8 +86,8 @@ export default function DashboardHome() {
   }, []);
 
   useEffect(() => {
-    loadDashboardData(bookings);
-  }, [bookings]);
+    loadDashboardData(bookings, units);
+  }, [bookings, units]);
 
   const loadDashboardData = (customBookings?: any[], customUnits?: any[]) => {
     // 2. Load Bookings
@@ -101,7 +101,7 @@ export default function DashboardHome() {
     );
 
     // 1. Calculate Unit Stats
-    const savedUnits = customUnits || (localStorage.getItem('playbox_mock_units') ? JSON.parse(localStorage.getItem('playbox_mock_units')!) : []);
+    const savedUnits = customUnits || (units.length > 0 ? units : (localStorage.getItem('playbox_mock_units') ? JSON.parse(localStorage.getItem('playbox_mock_units')!) : []));
     let totalU = 0, readyU = 0, disewaU = 0, maintenanceU = 0;
     
     if (savedUnits && savedUnits.length > 0) {
