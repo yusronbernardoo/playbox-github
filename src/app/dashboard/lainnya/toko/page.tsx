@@ -131,8 +131,17 @@ export default function PengaturanTokoPage() {
     try {
       await setDoc(doc(db, 'stores', getStoreId()), settingsData, { merge: true });
       
+      // Simpan slug mapping agar URL /store/[slug] bisa langsung meresolusi storeId secara real-time
+      if (finalSlug) {
+        await setDoc(doc(db, 'store_slugs', finalSlug), {
+          storeId: getStoreId(),
+          slug: finalSlug,
+          brandName: brandName || 'Nama Toko',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+      
       // 2. Save to localStorage only if Firestore succeeds
-      // Safely merge with existing local config to preserve validUntil locally
       const oldRaw = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
       let oldData = {};
       try { if (oldRaw) oldData = JSON.parse(oldRaw); } catch(e) {}

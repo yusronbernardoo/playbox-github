@@ -141,30 +141,76 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     });
   };
 
-  useEffect(() => {
-    // 1. Real-time Shop Profile Listener
-    const unsubscribeShop = onSnapshot(doc(db, 'stores', unwrappedParams.shopId), (snap) => {
-      let loadedProfile: any = null;
-      if (snap.exists()) {
-        loadedProfile = snap.data();
-      } else {
-        const local = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
-        if (local) {
-          try { loadedProfile = JSON.parse(local); } catch (e) {}
-        }
-      }
+  const [effectiveStoreId, setEffectiveStoreId] = useState<string>(unwrappedParams.shopId);
+  const effectiveStoreIdRef = useRef<string>(unwrappedParams.shopId);
 
-      if (loadedProfile) {
+  // 1. Smart Store Resolver: Memetakan slug (cth: 'playbox-malang') ke storeId asli (cth: 'demo' atau 'store123')
+  useEffect(() => {
+    let unsubDirect: (() => void) | null = null;
+    let unsubSlugDoc: (() => void) | null = null;
+    let unsubSlugQuery: (() => void) | null = null;
+
+    // A. Cek langsung jika params.shopId adalah storeId asli
+    unsubDirect = onSnapshot(doc(db, 'stores', unwrappedParams.shopId), (snap) => {
+      if (snap.exists()) {
+        setEffectiveStoreId(unwrappedParams.shopId);
+        effectiveStoreIdRef.current = unwrappedParams.shopId;
+        const data = snap.data();
+        setShopProfile(data);
+        setDisplayShopName(data.brandName || unwrappedParams.shopId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+      }
+    }, (err) => {
+      console.warn('Direct store check error:', err);
+    });
+
+    // B. Cek mapping di koleksi store_slugs
+    unsubSlugDoc = onSnapshot(doc(db, 'store_slugs', unwrappedParams.shopId), (snap) => {
+      if (snap.exists() && snap.data()?.storeId) {
+        const targetId = snap.data().storeId;
+        setEffectiveStoreId(targetId);
+        effectiveStoreIdRef.current = targetId;
+      }
+    }, (err) => {
+      console.warn('Slug doc mapping check error:', err);
+    });
+
+    // C. Cek query stores where slug == shopId
+    const slugQuery = query(collection(db, 'stores'), where('slug', '==', unwrappedParams.shopId));
+    unsubSlugQuery = onSnapshot(slugQuery, (snap) => {
+      if (!snap.empty) {
+        const targetDoc = snap.docs[0];
+        setEffectiveStoreId(targetDoc.id);
+        effectiveStoreIdRef.current = targetDoc.id;
+        const data = targetDoc.data();
+        setShopProfile(data);
+        setDisplayShopName(data.brandName || unwrappedParams.shopId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+      }
+    }, (err) => {
+      console.warn('Slug query check error:', err);
+    });
+
+    return () => {
+      if (unsubDirect) unsubDirect();
+      if (unsubSlugDoc) unsubSlugDoc();
+      if (unsubSlugQuery) unsubSlugQuery();
+    };
+  }, [unwrappedParams.shopId]);
+
+  // 2. Real-Time Data Listeners: Terikat langsung ke effectiveStoreId
+  useEffect(() => {
+    if (!effectiveStoreId) return;
+
+    // Profile listener
+    const unsubscribeShop = onSnapshot(doc(db, 'stores', effectiveStoreId), (snap) => {
+      if (snap.exists()) {
+        const loadedProfile = snap.data();
         setShopProfile(loadedProfile);
-        setDisplayShopName(loadedProfile.brandName || unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
-      } else {
-        setDisplayShopName(unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+        setDisplayShopName(loadedProfile.brandName || unwrappedParams.shopId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     }, (err) => {
       console.warn('Shop profile realtime sync error:', err);
     });
 
-    // 2. Real-time Units & Active Bookings Listener
     let activeBusyKeys = new Set<string>();
     let cachedActiveBookings: any[] = [];
     let rawUnitsList: any[] = [];
@@ -203,30 +249,20 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       });
     };
 
-    const unsubscribeUnits = onSnapshot(collection(db, 'stores', unwrappedParams.shopId, 'units'), (snapshot) => {
-      if (!snapshot.empty) {
-        const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        rawUnitsList = liveUnits;
-        setUnits(updateCombinedUnits(liveUnits));
-        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(liveUnits));
-      } else {
-        const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
-        if (savedUnits) {
-          try {
-            const parsed = JSON.parse(savedUnits);
-            rawUnitsList = parsed;
-            setUnits(updateCombinedUnits(parsed));
-          } catch {}
-        } else {
-          rawUnitsList = [];
-          setUnits([]);
-        }
-      }
+    // Units listener (100% cloud realtime sync)
+    const unsubscribeUnits = onSnapshot(collection(db, 'stores', effectiveStoreId, 'units'), (snapshot) => {
+      const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      rawUnitsList = liveUnits;
+      setUnits(updateCombinedUnits(liveUnits));
+      setIsLoading(false);
+    }, (err) => {
+      console.warn('Units realtime sync error:', err);
       setIsLoading(false);
     });
 
+    // Bookings listener
     const activeBookingsQuery = query(
-      collection(db, 'stores', unwrappedParams.shopId, 'bookings'),
+      collection(db, 'stores', effectiveStoreId, 'bookings'),
       where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa', 'Sedang Dipakai'])
     );
     
@@ -254,30 +290,25 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       if (rawUnitsList.length > 0) {
         setUnits(updateCombinedUnits(rawUnitsList));
       }
+    }, (err) => {
+      console.warn('Bookings realtime sync error:', err);
     });
 
-    const unsubscribePayments = onSnapshot(doc(db, 'stores', unwrappedParams.shopId, 'settings', 'payments'), (snap) => {
+    // Payment methods listener
+    const unsubscribePayments = onSnapshot(doc(db, 'stores', effectiveStoreId, 'settings', 'payments'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data.list)) {
           setPaymentMethods(data.list.filter((p: any) => p.active));
-          localStorage.setItem(getTenantStorageKey('playbox_payments'), JSON.stringify(data.list));
           return;
         }
       }
-
-      const savedPayments = localStorage.getItem(getTenantStorageKey('playbox_payments'));
-      if (savedPayments) {
-        try {
-          const parsed = JSON.parse(savedPayments);
-          setPaymentMethods(parsed.filter((p: any) => p.active));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      setPaymentMethods([]);
+    }, (err) => {
+      console.warn('Payments realtime sync error:', err);
     });
 
-    // 4. Real-time Timer to recalculate status every 30s based on actual clock
+    // Re-evaluate busy status every 30 seconds
     const intervalId = setInterval(() => {
       if (rawUnitsList.length > 0) {
         const now = Date.now();
@@ -306,7 +337,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       unsubscribePayments();
       clearInterval(intervalId);
     };
-  }, [unwrappedParams.shopId]);
+  }, [effectiveStoreId, unwrappedParams.shopId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -441,9 +472,10 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         createdAt: new Date().toISOString()
       };
 
-      // 1. Simpan ke Cloud Firestore (Real-Time)
+      // 1. Simpan ke Cloud Firestore (Real-Time ke storeId yang tepat)
+      const targetStoreId = effectiveStoreIdRef.current || effectiveStoreId || unwrappedParams.shopId;
       try {
-        await setDoc(doc(db, 'stores', unwrappedParams.shopId, 'bookings', newId), newBooking);
+        await setDoc(doc(db, 'stores', targetStoreId, 'bookings', newId), newBooking);
       } catch (err) {
         console.error('Gagal sync booking ke Firestore:', err);
       }
