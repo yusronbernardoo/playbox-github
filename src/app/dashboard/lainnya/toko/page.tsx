@@ -129,10 +129,15 @@ export default function PengaturanTokoPage() {
 
     // 1. Save to Cloud Firestore
     try {
-      await setDoc(doc(db, 'stores', getStoreId()), settingsData);
+      await setDoc(doc(db, 'stores', getStoreId()), settingsData, { merge: true });
       
       // 2. Save to localStorage only if Firestore succeeds
-      localStorage.setItem('playbox_shop_settings', JSON.stringify(settingsData));
+      // Safely merge with existing local config to preserve validUntil locally
+      const oldRaw = localStorage.getItem('playbox_shop_settings');
+      let oldData = {};
+      try { if (oldRaw) oldData = JSON.parse(oldRaw); } catch(e) {}
+
+      localStorage.setItem('playbox_shop_settings', JSON.stringify({ ...oldData, ...settingsData }));
       setSlug(finalSlug);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);

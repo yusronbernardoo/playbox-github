@@ -45,7 +45,7 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
                 : 'Masa aktif langganan Anda telah habis.'}
             </p>
             <a 
-              href="https://wa.me/6281234567890?text=Halo%20Admin%20Renterva,%20saya%20ingin%20memperpanjang%20langganan%20aplikasi." 
+              href={`https://wa.me/6282336756037?text=Halo%20Admin%20Renterva,%20saya%20dari%20toko%20${shopInfo.brandName || shopInfo.id}%20ingin%20memperpanjang%20langganan%20aplikasi.`} 
               target="_blank" 
               className="w-full block py-3.5 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_8px_30px_rgba(37,99,235,0.4)] hover:shadow-[0_8px_30px_rgba(37,99,235,0.6)] active:scale-95 transition-all text-sm"
             >
@@ -65,8 +65,15 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
     if (daysRemaining <= 3 && daysRemaining > 0) {
       warningBanner = (
         <div className="bg-orange-500/10 border-b border-orange-500/20 px-4 py-2 text-center sticky top-0 z-50 backdrop-blur-md">
-          <p className="text-[11px] sm:text-xs font-bold text-orange-400">
-            ⚠️ Masa aktif langganan sisa {daysRemaining} hari. Segera hubungi Admin untuk perpanjangan.
+          <p className="text-[11px] sm:text-xs font-medium text-orange-400">
+            ⚠️ Masa aktif langganan sisa <strong className="font-bold">{daysRemaining} hari</strong>.{' '}
+            <a 
+              href={`https://wa.me/6282336756037?text=Halo%20Admin%20Renterva,%20saya%20dari%20toko%20${shopInfo.brandName || shopInfo.id}%20ingin%20memperpanjang%20langganan%20aplikasi.`}
+              target="_blank"
+              className="font-bold underline hover:text-orange-300 transition-colors"
+            >
+              Klik di sini untuk WA Admin
+            </a>
           </p>
         </div>
       );

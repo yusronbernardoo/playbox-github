@@ -23,6 +23,7 @@ const Icons = {
 export default function SuperAdminPage() {
   const router = useRouter();
   const [isAuth, setIsAuth] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [stores, setStores] = useState<any[]>([]);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function SuperAdminPage() {
         return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
       });
       setStores(data);
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -293,9 +295,16 @@ export default function SuperAdminPage() {
               );
             })}
 
-            {stores.length === 0 && (
+            {stores.length === 0 && !isLoading && (
               <div className="col-span-full bg-[#18181b] p-12 rounded-2xl text-center border border-white/10">
                 <p className="text-white/40 text-sm">Belum ada tenant yang mendaftar.</p>
+              </div>
+            )}
+            
+            {isLoading && (
+              <div className="col-span-full flex flex-col items-center justify-center p-12">
+                <div className="w-8 h-8 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+                <p className="text-white/40 text-sm font-medium animate-pulse">Menarik data dari markas pusat...</p>
               </div>
             )}
           </div>
