@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -61,7 +61,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
         if (s.brandName) setBusinessName(s.brandName);
         if (s.logo) setBusinessLogo(s.logo);
       } else {
-        const saved = localStorage.getItem('playbox_shop_settings');
+        const saved = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed.brandName) setBusinessName(parsed.brandName);
@@ -84,7 +84,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
     }
 
     // Load Payment Methods
-    const savedPayments = localStorage.getItem('playbox_payments');
+    const savedPayments = localStorage.getItem(getTenantStorageKey('playbox_payments'));
     if (savedPayments) {
       const parsed = JSON.parse(savedPayments);
       setPaymentMethods(parsed.filter((p: any) => p.active));
@@ -97,7 +97,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
   }, [id]);
 
   const loadBookingLocal = () => {
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
+    const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
     if (savedBookings) {
       const parsed = JSON.parse(savedBookings);
       const found = parsed.find((b: any) => b.id === id);
@@ -175,7 +175,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
     }
 
     // 2. Sync ke localStorage
-    const saved = localStorage.getItem('playbox_mock_bookings');
+    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
     if (saved) {
       const bookings = JSON.parse(saved);
       const updated = bookings.map((b: any) => {
@@ -187,7 +187,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
         }
         return b;
       });
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(updated));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(updated));
       setBooking((prev: any) => ({ ...prev, ...updatePayload }));
     }
   };
@@ -303,11 +303,11 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
       console.error('Error deleting doc from firestore:', err);
     }
 
-    const saved = localStorage.getItem('playbox_mock_bookings');
+    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
     if (saved) {
       const bookings = JSON.parse(saved);
       const updated = bookings.filter((b: any) => b.id !== id);
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(updated));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(updated));
     }
     
     router.push('/dashboard/booking');
@@ -602,7 +602,7 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
       )}
 
       {/* Floating Action Buttons */}
-      <div className="fixed bottom-0 pb-6 w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 z-[60]">
+      <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 pb-6 sm:pb-4 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
         <div className="flex space-x-3 max-w-md mx-auto">
           {booking.status === 'Perlu Verifikasi' ? (
             <>

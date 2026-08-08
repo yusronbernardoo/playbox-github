@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -21,7 +21,7 @@ export default function LainnyaPage() {
       setUsername(parsed.username);
     }
     
-    const shopSettings = localStorage.getItem('playbox_shop_settings');
+    const shopSettings = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
     if (shopSettings) {
       try {
         const parsed = JSON.parse(shopSettings);
@@ -39,7 +39,7 @@ export default function LainnyaPage() {
         if (data.logo !== undefined) {
           setShopLogo(data.logo);
         }
-        localStorage.setItem('playbox_shop_settings', JSON.stringify(data));
+        localStorage.setItem(getTenantStorageKey('playbox_shop_settings'), JSON.stringify(data));
       }
     });
 

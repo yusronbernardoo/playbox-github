@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -41,7 +41,7 @@ export default function PengaturanTokoPage() {
 
       // 2. Fallback to localStorage
       if (!loaded) {
-        const local = localStorage.getItem('playbox_shop_settings');
+        const local = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
         if (local) {
           loaded = JSON.parse(local);
         }
@@ -133,12 +133,12 @@ export default function PengaturanTokoPage() {
       
       // 2. Save to localStorage only if Firestore succeeds
       // Safely merge with existing local config to preserve validUntil locally
-      const oldRaw = localStorage.getItem('playbox_shop_settings');
+      const oldRaw = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
       let oldData = {};
       try { if (oldRaw) oldData = JSON.parse(oldRaw); } catch(e) {}
 
       const newSettingsString = JSON.stringify({ ...oldData, ...settingsData });
-      localStorage.setItem('playbox_shop_settings', newSettingsString);
+      localStorage.setItem(getTenantStorageKey('playbox_shop_settings'), newSettingsString);
       window.dispatchEvent(new CustomEvent('local-sync', { detail: { key: 'playbox_shop_settings', newValue: newSettingsString } }));
       
       setSlug(finalSlug);

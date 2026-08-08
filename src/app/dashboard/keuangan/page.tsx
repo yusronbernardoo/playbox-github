@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -73,7 +73,7 @@ export default function Keuangan() {
           cloudBookings.push({ id: d.id, ...d.data() });
         });
       }
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(cloudBookings));
       loadFinancialData();
     }, (err) => console.warn('Bookings listener fallback:', err));
 
@@ -96,7 +96,7 @@ export default function Keuangan() {
   }, [router, period, selectedDate]);
 
   const loadFinancialData = async () => {
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
+    const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
     let totalPendapatan = 0;
     let prevPendapatan = 0;
     let totalRental = 0;

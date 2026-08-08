@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -39,7 +39,7 @@ export default function ReturnCheck() {
 
       // 2. Fallback to localStorage
       if (!b) {
-        const savedBookings = localStorage.getItem('playbox_mock_bookings');
+        const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
         if (savedBookings) {
           const bookings = JSON.parse(savedBookings);
           b = bookings.find((item: any) => item.id === id);
@@ -66,7 +66,7 @@ export default function ReturnCheck() {
         }
 
         // Setup unit specs checklist
-        const savedUnits = localStorage.getItem('playbox_mock_units');
+        const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
         if (savedUnits) {
           const units = JSON.parse(savedUnits);
           const unit = units.find((u: any) => u.id === b.unitId || u.name === b.unit);
@@ -152,8 +152,8 @@ export default function ReturnCheck() {
     }
 
     // 2. Update localStorage
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
-    const savedUnits = localStorage.getItem('playbox_mock_units');
+    const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
+    const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
     
     if (savedBookings) {
       let bookings = JSON.parse(savedBookings);
@@ -167,7 +167,7 @@ export default function ReturnCheck() {
           fines: finesData,
           totalPrice: updatedTotalPrice
         };
-        localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(bookings));
       }
     }
 
@@ -195,7 +195,7 @@ export default function ReturnCheck() {
         }
         return u;
       });
-      localStorage.setItem('playbox_mock_units', JSON.stringify(units));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(units));
     }
 
     setIsSubmitting(false);
@@ -204,7 +204,7 @@ export default function ReturnCheck() {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-32 relative min-h-screen">
+    <div className="p-4 space-y-6 pb-48 relative min-h-screen">
       <div className="ambient-glow"></div>
 
       {/* Header */}
@@ -339,7 +339,7 @@ export default function ReturnCheck() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 pb-6 w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-playbox-bg/95 backdrop-blur-xl border-t border-white/10 z-[60]">
+      <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 pb-6 sm:pb-4 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
         <div className="max-w-md mx-auto space-y-3">
           {bookingData?.documents && bookingData.documents.length > 0 && (
             <div className="bg-yellow-500/20 border border-yellow-500/50 p-3 rounded-xl flex items-start space-x-3 shadow-[0_0_15px_rgba(234,179,8,0.2)] animate-pulse">

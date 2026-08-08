@@ -1,6 +1,9 @@
 'use client';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export default function OngkirSettingsPage() {
   const router = useRouter();
@@ -9,23 +12,38 @@ export default function OngkirSettingsPage() {
   const [newRule, setNewRule] = useState({ minKm: '', maxKm: '', fee: '' });
 
   useEffect(() => {
-    const saved = localStorage.getItem('playbox_delivery_rules');
-    if (saved) {
-      setRules(JSON.parse(saved));
-    } else {
-      // Default fallback
-      const defaultRules = [
-        { minKm: 0, maxKm: 5, fee: 0 },
-        { minKm: 6, maxKm: 10, fee: 10000 },
-        { minKm: 11, maxKm: 15, fee: 20000 },
-        { minKm: 16, maxKm: 999, fee: 50000 }
-      ];
-      setRules(defaultRules);
-      localStorage.setItem('playbox_delivery_rules', JSON.stringify(defaultRules));
-    }
+    // 1. Real-time Firestore Listener
+    const unsubscribe = onSnapshot(doc(db, 'stores', getStoreId(), 'settings', 'ongkir'), (snap) => {
+      if (snap.exists() && Array.isArray(snap.data()?.list)) {
+        setRules(snap.data().list);
+        localStorage.setItem(getTenantStorageKey('playbox_delivery_rules'), JSON.stringify(snap.data().list));
+        return;
+      }
+
+      // Fallback to localStorage
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_delivery_rules'));
+      if (saved) {
+        try {
+          setRules(JSON.parse(saved));
+        } catch {}
+      } else {
+        const defaultRules = [
+          { minKm: 0, maxKm: 5, fee: 0 },
+          { minKm: 6, maxKm: 10, fee: 10000 },
+          { minKm: 11, maxKm: 15, fee: 20000 },
+          { minKm: 16, maxKm: 999, fee: 50000 }
+        ];
+        setRules(defaultRules);
+        localStorage.setItem(getTenantStorageKey('playbox_delivery_rules'), JSON.stringify(defaultRules));
+      }
+    }, (err) => {
+      console.warn('Firestore ongkir listener error:', err);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const handleAddRule = (e: React.FormEvent) => {
+  const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRule.minKm || !newRule.maxKm || !newRule.fee) return alert('Lengkapi semua kolom!');
     
@@ -41,22 +59,40 @@ export default function OngkirSettingsPage() {
     updatedRules.sort((a, b) => a.minKm - b.minKm);
     
     setRules(updatedRules);
-    localStorage.setItem('playbox_delivery_rules', JSON.stringify(updatedRules));
+    localStorage.setItem(getTenantStorageKey('playbox_delivery_rules'), JSON.stringify(updatedRules));
+    
+    try {
+      await setDoc(doc(db, 'stores', getStoreId(), 'settings', 'ongkir'), {
+        list: updatedRules,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Failed to sync ongkir to Firestore:', err);
+    }
     
     setNewRule({ minKm: '', maxKm: '', fee: '' });
   };
 
-  const removeRule = (idx: number) => {
+  const removeRule = async (idx: number) => {
     const confirmDelete = window.confirm('Hapus aturan ongkir ini?');
     if (confirmDelete) {
       const updated = rules.filter((_, i) => i !== idx);
       setRules(updated);
-      localStorage.setItem('playbox_delivery_rules', JSON.stringify(updated));
+      localStorage.setItem(getTenantStorageKey('playbox_delivery_rules'), JSON.stringify(updated));
+      
+      try {
+        await setDoc(doc(db, 'stores', getStoreId(), 'settings', 'ongkir'), {
+          list: updated,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.error('Failed to sync ongkir delete to Firestore:', err);
+      }
     }
   };
 
   return (
-    <div className="p-4 pb-28 min-h-screen flex flex-col relative">
+    <div className="p-4 pb-32 min-h-screen flex flex-col relative">
       <div className="ambient-glow"></div>
 
       {/* Header */}
@@ -102,48 +138,52 @@ export default function OngkirSettingsPage() {
           
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] uppercase text-white/50 mb-1.5 font-medium">Jarak Min (km)</label>
+              <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Min Jarak (Km)</label>
               <input 
                 type="number" 
+                min="0"
                 value={newRule.minKm}
-                onChange={e => setNewRule({...newRule, minKm: e.target.value})}
-                className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent"
-                placeholder="Mis: 16"
+                onChange={e => setNewRule({ ...newRule, minKm: e.target.value })}
+                placeholder="Mis: 0"
+                className="w-full p-3 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent"
                 required
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase text-white/50 mb-1.5 font-medium">Jarak Max (km)</label>
+              <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Max Jarak (Km)</label>
               <input 
                 type="number" 
+                min="1"
                 value={newRule.maxKm}
-                onChange={e => setNewRule({...newRule, maxKm: e.target.value})}
-                className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent"
-                placeholder="999 = Tak Terbatas"
+                onChange={e => setNewRule({ ...newRule, maxKm: e.target.value })}
+                placeholder="Mis: 5 atau 999"
+                className="w-full p-3 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent"
                 required
               />
             </div>
           </div>
+
           <div>
-            <label className="block text-[10px] uppercase text-white/50 mb-1.5 font-medium">Biaya Ongkir (Rp)</label>
+            <label className="block text-[11px] font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Tarif Ongkir (Rp)</label>
             <input 
               type="number" 
+              min="0"
               value={newRule.fee}
-              onChange={e => setNewRule({...newRule, fee: e.target.value})}
-              className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent"
-              placeholder="Mis: 40000"
+              onChange={e => setNewRule({ ...newRule, fee: e.target.value })}
+              placeholder="Mis: 10000 (0 = Gratis)"
+              className="w-full p-3 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent"
               required
             />
+            <p className="text-[10px] text-white/40 mt-1">Masukkan 0 jika ingin gratis ongkir untuk jarak ini.</p>
           </div>
-          <button type="submit" className="w-full py-3 bg-white/10 hover:bg-playbox-accent text-white rounded-xl text-sm font-semibold transition-colors mt-2">
-            Simpan Aturan Jarak
+
+          <button 
+            type="submit"
+            className="w-full py-3.5 bg-playbox-accent text-white font-bold rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:bg-blue-600 transition-all text-xs"
+          >
+            + Simpan Aturan Jarak
           </button>
         </form>
-        
-        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-200 text-[11px] leading-relaxed">
-          <strong className="block text-blue-400 mb-1">💡 Tips Owner:</strong>
-          Gunakan angka <b>999</b> pada Jarak Max untuk membuat tarif <i>"Batas Tak Terhingga"</i> (Misal: Jarak lebih dari 16km, maka Jarak Min: 16, Jarak Max: 999).
-        </div>
       </div>
     </div>
   );

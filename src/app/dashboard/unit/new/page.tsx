@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -87,7 +87,7 @@ export default function UnitNew() {
     }
 
     // 2. Simpan juga ke LocalStorage sebagai offline cache
-    const saved = localStorage.getItem('playbox_mock_units');
+    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
     let units = [];
     if (saved) {
       try {
@@ -96,7 +96,7 @@ export default function UnitNew() {
     }
     units.push(newUnit);
     const newUnitsString = JSON.stringify(units);
-    localStorage.setItem('playbox_mock_units', newUnitsString);
+    localStorage.setItem(getTenantStorageKey('playbox_mock_units'), newUnitsString);
     window.dispatchEvent(new CustomEvent('local-sync', { detail: { key: 'playbox_mock_units', newValue: newUnitsString } }));
 
     setIsSubmitting(false);
@@ -118,7 +118,7 @@ export default function UnitNew() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Info Dasar */}
-        <div className="glass-surface p-6 rounded-3xl space-y-5">
+        <div className={`glass-surface p-6 rounded-3xl space-y-5 relative ${isTypeOpen ? 'z-30' : 'z-20'}`}>
           <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">Info Dasar</h2>
           
           <div>
@@ -150,25 +150,28 @@ export default function UnitNew() {
             <div className="relative">
               <div 
                 onClick={() => setIsTypeOpen(!isTypeOpen)}
-                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'border-white/10 hover:border-white/20'}`}
+                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeOpen ? 'border-playbox-accent shadow-[0_0_12px_rgba(37,99,235,0.4)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'}`}
               >
-                <span>{formData.type}</span>
-                <span className={`text-[10px] transition-transform duration-300 ${isTypeOpen ? 'rotate-180 text-playbox-accent' : 'opacity-50'}`}>▼</span>
+                <span className="font-semibold">{formData.type}</span>
+                <span className={`text-[10px] text-playbox-accent transition-transform duration-300 ${isTypeOpen ? 'rotate-180' : 'opacity-60'}`}>▼</span>
               </div>
               
               {isTypeOpen && (
-                <div className="absolute top-full left-0 w-full mt-2 bg-[#10152B] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
-                  {['PlayStation 5', 'PlayStation 4', 'PlayStation 3', 'Nintendo Switch'].map(t => (
-                    <div 
-                      key={t}
-                      onClick={() => { setFormData({...formData, type: t}); setIsTypeOpen(false); }}
-                      className={`p-4 text-sm cursor-pointer transition-colors flex items-center justify-between ${formData.type === t ? 'bg-playbox-accent/10 text-playbox-accent font-semibold' : 'text-white/80 hover:bg-white/5'}`}
-                    >
-                      {t}
-                      {formData.type === t && <span className="text-playbox-accent">✓</span>}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsTypeOpen(false)}></div>
+                  <div className="absolute top-full left-0 w-full mt-2 bg-[#0D1122]/98 border border-white/20 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(0,0,0,0.8)] z-50 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
+                    {['PlayStation 5', 'PlayStation 4', 'PlayStation 3', 'Nintendo Switch'].map(t => (
+                      <div 
+                        key={t}
+                        onClick={() => { setFormData({...formData, type: t}); setIsTypeOpen(false); }}
+                        className={`p-4 text-sm cursor-pointer transition-colors flex items-center justify-between ${formData.type === t ? 'bg-playbox-accent/20 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'}`}
+                      >
+                        <span>{t}</span>
+                        {formData.type === t && <span className="text-playbox-accent font-bold">✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -336,7 +339,7 @@ export default function UnitNew() {
         </div>
 
         {/* Floating Action Buttons */}
-        <div className="fixed bottom-[72px] w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-playbox-bg/80 backdrop-blur-xl border-t border-white/5 z-50">
+        <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-[#0A0F1F]/95 backdrop-blur-xl border-t border-white/10 z-50 shadow-2xl">
           <div className="max-w-md mx-auto">
             <button 
               type="submit" 

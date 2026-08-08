@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { useParams, useRouter } from 'next/navigation';
@@ -40,7 +40,7 @@ export default function TimelineBooking() {
           if (s.brandName) setBusinessName(s.brandName);
           if (s.logo) setBusinessLogo(s.logo);
         } else {
-          const shopSettings = localStorage.getItem('playbox_shop_settings');
+          const shopSettings = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
           if (shopSettings) {
             const parsed = JSON.parse(shopSettings);
             if (parsed.brandName) setBusinessName(parsed.brandName);
@@ -49,7 +49,7 @@ export default function TimelineBooking() {
         }
 
         // Payments
-        const savedPayments = localStorage.getItem('playbox_payments');
+        const savedPayments = localStorage.getItem(getTenantStorageKey('playbox_payments'));
         if (savedPayments) {
           const parsed = JSON.parse(savedPayments);
           setPaymentMethods(parsed.filter((p: any) => p.active && p.type !== 'QRIS'));
@@ -69,7 +69,7 @@ export default function TimelineBooking() {
       if (docSnap.exists()) {
         b = { ...docSnap.data(), id: docSnap.id };
       } else {
-        const saved = localStorage.getItem('playbox_mock_bookings');
+        const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
         if (saved) {
           const bookings = JSON.parse(saved);
           b = bookings.find((item: any) => item.id === id);
@@ -210,7 +210,7 @@ export default function TimelineBooking() {
       }
 
       // 2. Save to localStorage
-      const savedBookings = localStorage.getItem('playbox_mock_bookings');
+      const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
       if (savedBookings) {
         const parsedBookings = JSON.parse(savedBookings);
         const updatedBookings = parsedBookings.map((b: any) => {
@@ -225,7 +225,7 @@ export default function TimelineBooking() {
           }
           return b;
         });
-        localStorage.setItem('playbox_mock_bookings', JSON.stringify(updatedBookings));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(updatedBookings));
       }
     }
   };

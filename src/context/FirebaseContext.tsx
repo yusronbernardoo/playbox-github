@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 
 interface Booking {
   id: string;
@@ -38,15 +39,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const initialLoadRef = useRef(true);
 
   useEffect(() => {
-    // 1. Get storeId from Auth
-    let storeId = 'demo'; // fallback
+    const storeId = getStoreId();
+
+    // 0. Load cached data first for instant render
     if (typeof window !== 'undefined') {
-      const auth = localStorage.getItem('playbox_auth');
-      if (auth) {
-        try {
-          const parsed = JSON.parse(auth);
-          if (parsed.storeId) storeId = parsed.storeId;
-        } catch (e) {}
+      const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
+      if (savedBookings) {
+        try { setBookings(JSON.parse(savedBookings)); } catch (e) {}
+      }
+      const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
+      if (savedUnits) {
+        try { setUnits(JSON.parse(savedUnits)); } catch (e) {}
+      }
+      const savedShop = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
+      if (savedShop) {
+        try { setShopInfo(JSON.parse(savedShop)); } catch (e) {}
       }
     }
 
@@ -64,7 +71,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setBookings(cloudBookings);
       
       // Also cache it just for fallback
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(cloudBookings));
 
       // Notification Logic using docChanges for accuracy
       if (!initialLoadRef.current) {
@@ -87,7 +94,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       
     }, (error) => {
       console.warn('Firestore real-time error:', error);
-      const saved = localStorage.getItem('playbox_mock_bookings');
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
       if (saved) setBookings(JSON.parse(saved));
       setIsLoading(false);
     });
@@ -97,9 +104,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (snap.exists()) {
         const data = snap.data();
         setShopInfo(data);
-        localStorage.setItem('playbox_shop_settings', JSON.stringify(data));
+        localStorage.setItem(getTenantStorageKey('playbox_shop_settings'), JSON.stringify(data));
       } else {
-        const saved = localStorage.getItem('playbox_shop_settings');
+        const saved = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
         if (saved) setShopInfo(JSON.parse(saved));
       }
     });
@@ -111,21 +118,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         cloudUnits.push({ ...docSnap.data(), id: docSnap.id });
       });
       setUnits(cloudUnits);
-      localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(cloudUnits));
     }, (error) => {
       console.warn('Firestore units error:', error);
-      const saved = localStorage.getItem('playbox_mock_units');
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
       if (saved) setUnits(JSON.parse(saved));
     });
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'playbox_mock_bookings' && e.newValue) {
+      if (e.key === getTenantStorageKey('playbox_mock_bookings') && e.newValue) {
         setBookings(JSON.parse(e.newValue));
       }
-      if (e.key === 'playbox_mock_units' && e.newValue) {
+      if (e.key === getTenantStorageKey('playbox_mock_units') && e.newValue) {
         setUnits(JSON.parse(e.newValue));
       }
-      if (e.key === 'playbox_shop_settings' && e.newValue) {
+      if (e.key === getTenantStorageKey('playbox_shop_settings') && e.newValue) {
         setShopInfo(JSON.parse(e.newValue));
       }
     };
@@ -133,13 +140,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Custom event to force sync in the SAME tab immediately
     const handleLocalSync = (e: CustomEvent) => {
       const { key, newValue } = e.detail;
-      if (key === 'playbox_mock_bookings' && newValue) {
+      if (key === getTenantStorageKey('playbox_mock_bookings') && newValue) {
         setBookings(JSON.parse(newValue));
       }
-      if (key === 'playbox_mock_units' && newValue) {
+      if (key === getTenantStorageKey('playbox_mock_units') && newValue) {
         setUnits(JSON.parse(newValue));
       }
-      if (key === 'playbox_shop_settings' && newValue) {
+      if (key === getTenantStorageKey('playbox_shop_settings') && newValue) {
         setShopInfo(JSON.parse(newValue));
       }
     };

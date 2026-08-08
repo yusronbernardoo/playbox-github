@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 

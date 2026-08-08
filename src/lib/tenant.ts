@@ -10,3 +10,8 @@ export function getStoreId(): string {
   }
   return 'demo'; // default fallback tenant
 }
+
+export function getTenantStorageKey(baseKey: string, customStoreId?: string): string {
+  const shopId = customStoreId || getStoreId();
+  return `${baseKey}_${shopId}`;
+}

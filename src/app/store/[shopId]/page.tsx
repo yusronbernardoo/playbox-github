@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DayPicker } from 'react-day-picker';
@@ -57,7 +57,6 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
   useEffect(() => {
     if (showSuccess && submittedBooking && invoiceRef.current) {
-      // Beri sedikit jeda agar gambar dan font ter-render dengan baik
       const timer = setTimeout(() => {
         toPng(invoiceRef.current as HTMLElement, { backgroundColor: '#ffffff', cacheBust: true, pixelRatio: 2 })
           .then((dataUrl) => {
@@ -149,8 +148,10 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       if (snap.exists()) {
         loadedProfile = snap.data();
       } else {
-        const local = localStorage.getItem('playbox_shop_settings');
-        if (local) loadedProfile = JSON.parse(local);
+        const local = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
+        if (local) {
+          try { loadedProfile = JSON.parse(local); } catch (e) {}
+        }
       }
 
       if (loadedProfile) {
@@ -207,9 +208,9 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         rawUnitsList = liveUnits;
         setUnits(updateCombinedUnits(liveUnits));
-        localStorage.setItem('playbox_mock_units', JSON.stringify(liveUnits));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(liveUnits));
       } else {
-        const savedUnits = localStorage.getItem('playbox_mock_units');
+        const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
         if (savedUnits) {
           try {
             const parsed = JSON.parse(savedUnits);
@@ -224,8 +225,6 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       setIsLoading(false);
     });
 
-    // 2. Real-time Units & Active Bookings Listener
-    // OPTIMIZED: Only fetch active bookings so it loads instantly!
     const activeBookingsQuery = query(
       collection(db, 'stores', unwrappedParams.shopId, 'bookings'),
       where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa', 'Sedang Dipakai'])
@@ -257,18 +256,17 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       }
     });
 
-    // 3. Real-time Payment Methods Listener
-    const unsubscribePayments = onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
+    const unsubscribePayments = onSnapshot(doc(db, 'stores', unwrappedParams.shopId, 'settings', 'payments'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data.list)) {
           setPaymentMethods(data.list.filter((p: any) => p.active));
-          localStorage.setItem('playbox_payments', JSON.stringify(data.list));
+          localStorage.setItem(getTenantStorageKey('playbox_payments'), JSON.stringify(data.list));
           return;
         }
       }
 
-      const savedPayments = localStorage.getItem('playbox_payments');
+      const savedPayments = localStorage.getItem(getTenantStorageKey('playbox_payments'));
       if (savedPayments) {
         try {
           const parsed = JSON.parse(savedPayments);
@@ -279,11 +277,34 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       }
     });
 
+    // 4. Real-time Timer to recalculate status every 30s based on actual clock
+    const intervalId = setInterval(() => {
+      if (rawUnitsList.length > 0) {
+        const now = Date.now();
+        const busySet = new Set<string>();
+        
+        cachedActiveBookings.forEach((b: any) => {
+            const startMs = b.isoStart ? new Date(b.isoStart).getTime() : 
+                           (b.startTime ? new Date(`${b.startDate || ''} ${b.startTime}`).getTime() : 0);
+            const durationHours = Number(b.durationHours || b.duration || 24);
+            const endMs = b.isoEnd ? new Date(b.isoEnd).getTime() : startMs + (durationHours * 60 * 60 * 1000);
+            
+            if (now >= startMs && now <= endMs) {
+               if (b.unitId) busySet.add(b.unitId);
+               if (b.unit) busySet.add(b.unit);
+            }
+        });
+        activeBusyKeys = busySet;
+        setUnits(updateCombinedUnits(rawUnitsList));
+      }
+    }, 30000);
+
     return () => {
       unsubscribeShop();
       unsubscribeUnits();
       unsubscribeBookings();
       unsubscribePayments();
+      clearInterval(intervalId);
     };
   }, [unwrappedParams.shopId]);
 
@@ -362,7 +383,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     setIsSubmitting(true);
 
     try {
-      const savedBookings = localStorage.getItem('playbox_mock_bookings');
+      const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
       const bookings = savedBookings ? JSON.parse(savedBookings) : [];
       
       const newId = `B0${Date.now().toString().slice(-4)}`;
@@ -422,14 +443,14 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
       // 1. Simpan ke Cloud Firestore (Real-Time)
       try {
-        await setDoc(doc(db, 'stores', getStoreId(), 'bookings', newId), newBooking);
+        await setDoc(doc(db, 'stores', unwrappedParams.shopId, 'bookings', newId), newBooking);
       } catch (err) {
         console.error('Gagal sync booking ke Firestore:', err);
       }
 
       // 2. Simpan juga ke localStorage
       bookings.unshift(newBooking);
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(bookings));
       
       setSubmittedBooking(newBooking);
       setIsSubmitting(false);
@@ -466,7 +487,6 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       
       {/* Header */}
       <header className="relative z-10 p-5 pt-8 text-center pb-6 border-b border-white/5 bg-black/30 backdrop-blur-md">
-        
         {/* Custom Logo / Avatar */}
         <div className="w-20 h-20 mx-auto rounded-3xl bg-black/40 border border-white/15 flex items-center justify-center shadow-[0_10px_30px_rgba(37,99,235,0.3)] mb-3 overflow-hidden">
           {shopProfile.logo ? (

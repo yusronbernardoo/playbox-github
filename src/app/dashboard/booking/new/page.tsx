@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
@@ -63,7 +63,7 @@ export default function NewBooking() {
 
   useEffect(() => {
     // 1. Fallback local units
-    const saved = localStorage.getItem('playbox_mock_units');
+    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -78,7 +78,7 @@ export default function NewBooking() {
         snap.forEach(d => {
           cloudUnits.push({ ...d.data(), id: d.id });
         });
-        localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(cloudUnits));
         setAvailableUnits(cloudUnits.filter(u => u.status === 'Ready'));
       }
     });
@@ -97,7 +97,7 @@ export default function NewBooking() {
       localStorage.setItem('playbox_delivery_rules', JSON.stringify(defaultRules));
     }
 
-    const savedPayments = localStorage.getItem('playbox_payments');
+    const savedPayments = localStorage.getItem(getTenantStorageKey('playbox_payments'));
     if (savedPayments) {
       setSavedPaymentMethods(JSON.parse(savedPayments).filter((p: any) => p.active));
     }
@@ -309,21 +309,21 @@ export default function NewBooking() {
       }
 
       // 2. Sync ke localStorage
-      const savedBookings = localStorage.getItem('playbox_mock_bookings');
+      const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
       let bookings = [];
       if (savedBookings) {
         bookings = JSON.parse(savedBookings);
       }
       bookings.push(newBooking);
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(bookings));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(bookings));
 
-      const savedUnits = localStorage.getItem('playbox_mock_units');
+      const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
       if (savedUnits) {
         const units = JSON.parse(savedUnits);
         const updatedUnits = units.map((u: any) => 
           u.id === selectedUnit.id ? { ...u, status: 'Disewa', statusColor: 'bg-playbox-disewa/15 text-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.3)]' } : u
         );
-        localStorage.setItem('playbox_mock_units', JSON.stringify(updatedUnits));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(updatedUnits));
       }
 
       alert("Booking berhasil dibuat!");

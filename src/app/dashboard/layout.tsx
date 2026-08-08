@@ -7,6 +7,7 @@ import NotificationToast from '@/components/NotificationToast';
 
 function DashboardContent({ children, tabs, pathname }: { children: React.ReactNode, tabs: any[], pathname: string }) {
   const { isLoading, shopInfo } = useFirebase();
+  const isMainTab = ['/dashboard', '/dashboard/unit', '/dashboard/booking', '/dashboard/keuangan', '/dashboard/lainnya'].includes(pathname);
 
   if (isLoading) {
     return (
@@ -87,38 +88,40 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
       {warningBanner}
 
       {/* Main Content Area */}
-      <main className="flex-1 pb-24 overflow-y-auto relative z-10">
+      <main className={`flex-1 ${isMainTab ? 'pb-24' : 'pb-6'} overflow-y-auto relative z-10`}>
         {children}
       </main>
 
       <NotificationToast />
 
-      {/* Premium Bottom Navigation */}
-      <nav className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 bg-[#0E1221]/80 backdrop-blur-2xl border-t border-white/5 px-4 py-3 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-        {tabs.map((tab) => {
-          const isActive = pathname === tab.path || (tab.path !== '/dashboard' && pathname.startsWith(tab.path));
-          
-          return (
-            <Link 
-              key={tab.name} 
-              href={tab.path}
-              className="relative flex flex-col items-center flex-1 transition-all duration-300 ease-out active:scale-95 group"
-            >
-              {/* Active Indicator Glow */}
-              {isActive && (
-                <div className="absolute -top-3 w-8 h-1 bg-playbox-accent rounded-b-full shadow-[0_4px_12px_rgba(37,99,235,0.8)]"></div>
-              )}
-              
-              <span className={`text-xl mb-1 transition-transform duration-300 ${isActive ? '-translate-y-1 drop-shadow-[0_0_8px_rgba(37,99,235,0.5)]' : 'group-hover:-translate-y-0.5 opacity-70 group-hover:opacity-100'}`}>
-                {tab.icon}
-              </span>
-              <span className={`text-[10px] font-medium transition-all duration-300 ${isActive ? 'text-white' : 'text-playbox-text-secondary opacity-70 group-hover:opacity-100'}`}>
-                {tab.name}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Premium Bottom Navigation - only displayed on main tabs */}
+      {isMainTab && (
+        <nav className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 bg-[#0E1221]/90 backdrop-blur-2xl border-t border-white/5 px-4 py-3 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+          {tabs.map((tab) => {
+            const isActive = pathname === tab.path;
+            
+            return (
+              <Link 
+                key={tab.name} 
+                href={tab.path}
+                className="relative flex flex-col items-center flex-1 transition-all duration-300 ease-out active:scale-95 group"
+              >
+                {/* Active Indicator Glow */}
+                {isActive && (
+                  <div className="absolute -top-3 w-8 h-1 bg-playbox-accent rounded-b-full shadow-[0_4px_12px_rgba(37,99,235,0.8)]"></div>
+                )}
+                
+                <span className={`text-xl mb-1 transition-transform duration-300 ${isActive ? '-translate-y-1 drop-shadow-[0_0_8px_rgba(37,99,235,0.5)]' : 'group-hover:-translate-y-0.5 opacity-70 group-hover:opacity-100'}`}>
+                  {tab.icon}
+                </span>
+                <span className={`text-[10px] font-medium transition-all duration-300 ${isActive ? 'text-white font-bold' : 'text-playbox-text-secondary opacity-70 group-hover:opacity-100'}`}>
+                  {tab.name}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

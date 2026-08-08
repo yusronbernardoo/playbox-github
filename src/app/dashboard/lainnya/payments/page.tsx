@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
@@ -78,18 +79,18 @@ export default function PaymentMethods() {
 
   useEffect(() => {
     // 1. Real-time Firestore Listener
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'payments'), (docSnap) => {
+    const unsubscribe = onSnapshot(doc(db, 'stores', getStoreId(), 'settings', 'payments'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (Array.isArray(data.list)) {
           setMethods(data.list);
-          localStorage.setItem('playbox_payments', JSON.stringify(data.list));
+          localStorage.setItem(getTenantStorageKey('playbox_payments'), JSON.stringify(data.list));
           return;
         }
       }
 
       // Fallback to localStorage
-      const saved = localStorage.getItem('playbox_payments');
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_payments'));
       if (saved) {
         try {
           setMethods(JSON.parse(saved));
@@ -102,7 +103,7 @@ export default function PaymentMethods() {
           { id: 'P02', type: 'E-Wallet', name: 'GoPay', account: '081234567890', owner: 'Budi Santoso', active: true },
         ];
         setMethods(initial);
-        localStorage.setItem('playbox_payments', JSON.stringify(initial));
+        localStorage.setItem(getTenantStorageKey('playbox_payments'), JSON.stringify(initial));
       }
     }, (err) => {
       console.warn('Firestore payment listener error:', err);
@@ -193,13 +194,13 @@ export default function PaymentMethods() {
       }
 
       // 1. Save to Cloud Firestore
-      await setDoc(doc(db, 'settings', 'payments'), {
+      await setDoc(doc(db, 'stores', getStoreId(), 'settings', 'payments'), {
         list: updated,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
       // 2. Save to localStorage
-      localStorage.setItem('playbox_payments', JSON.stringify(updated));
+      localStorage.setItem(getTenantStorageKey('playbox_payments'), JSON.stringify(updated));
       setMethods(updated);
       setShowModal(false);
     } catch (e: any) {
@@ -216,11 +217,11 @@ export default function PaymentMethods() {
       setMethods(updated);
       
       try {
-        await setDoc(doc(db, 'settings', 'payments'), {
+        await setDoc(doc(db, 'stores', getStoreId(), 'settings', 'payments'), {
           list: updated,
           updatedAt: new Date().toISOString()
         }, { merge: true });
-        localStorage.setItem('playbox_payments', JSON.stringify(updated));
+        localStorage.setItem(getTenantStorageKey('playbox_payments'), JSON.stringify(updated));
       } catch (err) {
         console.error('Failed to delete payment from Firestore:', err);
       }
@@ -323,17 +324,17 @@ export default function PaymentMethods() {
 
       {/* Modal Add/Edit */}
       {showModal && (
-        <div className="fixed inset-0 z-50 max-w-md mx-auto flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-[#0A0F1F] w-full max-h-[90vh] overflow-y-auto sm:rounded-3xl rounded-t-3xl border border-white/10 shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 duration-300 relative">
-            <div className="p-6 border-b border-white/5 sticky top-0 bg-[#0A0F1F]/90 backdrop-blur-md z-10 flex justify-between items-center">
+        <div className="fixed inset-0 z-[100] max-w-md mx-auto flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-[#0A0F1F] w-full max-h-[88vh] sm:rounded-3xl rounded-t-3xl border border-white/10 shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 duration-300 relative overflow-hidden">
+            <div className="p-5 border-b border-white/10 shrink-0 bg-[#0A0F1F]/95 backdrop-blur-md z-10 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">{editId ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran'}</h2>
-                <p className="text-xs text-white/50">Tersinkronisasi otomatis ke Cloud</p>
+                <h2 className="text-lg font-bold">{editId ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran'}</h2>
+                <p className="text-[11px] text-white/50">Tersinkronisasi otomatis ke Cloud</p>
               </div>
               <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 text-white/70">✕</button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div>
                 <label className="block text-xs font-bold text-white/60 uppercase mb-2">Jenis Pembayaran</label>
                 <div className="flex gap-2">
@@ -443,12 +444,12 @@ export default function PaymentMethods() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-white/5 bg-black/20 flex gap-3">
+            <div className="p-4 pb-6 sm:pb-4 border-t border-white/10 bg-[#0A0F1F] shrink-0 flex gap-3 z-20">
               {editId && (
                 <button 
                   type="button"
                   onClick={() => deleteMethod(editId)} 
-                  className="p-4 rounded-xl font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 w-16 flex justify-center items-center border border-red-500/20 transition-colors"
+                  className="p-3.5 rounded-xl font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 w-14 flex justify-center items-center border border-red-500/20 transition-colors"
                 >
                   🗑
                 </button>
@@ -457,7 +458,7 @@ export default function PaymentMethods() {
                 type="button"
                 onClick={saveMethod} 
                 disabled={isSaving || isCompressing}
-                className="flex-1 py-4 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-[#ff1e9f] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                className="flex-1 py-4 bg-playbox-accent text-white rounded-xl font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-blue-600 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
               >
                 {isSaving ? 'Menyimpan Data...' : 'Simpan Data Pembayaran'}
               </button>

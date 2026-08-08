@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -19,7 +19,7 @@ export default function UnitDetail() {
       if (snap.exists()) {
         setUnit({ ...snap.data(), id: snap.id });
       } else {
-        const saved = localStorage.getItem('playbox_mock_units');
+        const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
         if (saved) {
           try {
             const units = JSON.parse(saved);
@@ -30,7 +30,7 @@ export default function UnitDetail() {
       }
     }, (err) => {
       console.warn('Unit snapshot error:', err);
-      const saved = localStorage.getItem('playbox_mock_units');
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
       if (saved) {
         try {
           const units = JSON.parse(saved);
@@ -53,12 +53,12 @@ export default function UnitDetail() {
         console.error('Error deleting unit from Firestore:', err);
       }
 
-      const saved = localStorage.getItem('playbox_mock_units');
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
       if (saved) {
         try {
           let units = JSON.parse(saved);
           units = units.filter((u: any) => u.id !== id);
-          localStorage.setItem('playbox_mock_units', JSON.stringify(units));
+          localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(units));
         } catch {}
       }
       alert('Unit berhasil dihapus!');

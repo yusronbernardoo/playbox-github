@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -58,7 +58,7 @@ export default function EditUnit() {
       }
 
       if (!found) {
-        const saved = localStorage.getItem('playbox_mock_units');
+        const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
         if (saved) {
           try {
             const units = JSON.parse(saved);
@@ -145,12 +145,12 @@ export default function EditUnit() {
     }
 
     // 2. Sync to LocalStorage
-    const saved = localStorage.getItem('playbox_mock_units');
+    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
     if (saved) {
       try {
         const units = JSON.parse(saved);
         const updated = units.map((u: any) => u.id === id ? cleanedUnit : u);
-        localStorage.setItem('playbox_mock_units', JSON.stringify(updated));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(updated));
       } catch {}
     }
     
@@ -159,7 +159,7 @@ export default function EditUnit() {
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto space-y-6 pb-28 relative">
+    <div className="p-4 max-w-xl mx-auto space-y-6 pb-36 relative">
       <div className="ambient-glow"></div>
 
       {/* Header */}
@@ -202,7 +202,7 @@ export default function EditUnit() {
         </div>
 
         {/* Informasi Utama */}
-        <div className="glass-surface p-6 rounded-3xl space-y-5 relative z-20">
+        <div className={`glass-surface p-6 rounded-3xl space-y-5 relative ${isTypeOpen || isStatusOpen ? 'z-30' : 'z-20'}`}>
           <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">Informasi Utama</h2>
           
           <div>
@@ -221,25 +221,28 @@ export default function EditUnit() {
             <div className="relative">
               <div 
                 onClick={() => setIsTypeOpen(!isTypeOpen)}
-                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'border-white/10 hover:border-white/20'}`}
+                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeOpen ? 'border-playbox-accent shadow-[0_0_12px_rgba(37,99,235,0.4)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'}`}
               >
-                <span>{unit.type}</span>
-                <span className={`text-[10px] transition-transform duration-300 ${isTypeOpen ? 'rotate-180 text-playbox-accent' : 'opacity-50'}`}>▼</span>
+                <span className="font-semibold">{unit.type}</span>
+                <span className={`text-[10px] text-playbox-accent transition-transform duration-300 ${isTypeOpen ? 'rotate-180' : 'opacity-60'}`}>▼</span>
               </div>
               
               {isTypeOpen && (
-                <div className="absolute top-full left-0 w-full mt-2 bg-[#10152B] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
-                  {['PlayStation 5', 'PlayStation 4', 'PlayStation 3', 'Nintendo Switch'].map(t => (
-                    <div 
-                      key={t}
-                      onClick={() => { setUnit({...unit, type: t}); setIsTypeOpen(false); }}
-                      className={`p-4 text-sm cursor-pointer transition-colors flex items-center justify-between ${unit.type === t ? 'bg-playbox-accent/10 text-playbox-accent font-semibold' : 'text-white/80 hover:bg-white/5'}`}
-                    >
-                      {t}
-                      {unit.type === t && <span className="text-playbox-accent">✓</span>}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsTypeOpen(false)}></div>
+                  <div className="absolute top-full left-0 w-full mt-2 bg-[#0D1122]/98 border border-white/20 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(0,0,0,0.8)] z-50 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
+                    {['PlayStation 5', 'PlayStation 4', 'PlayStation 3', 'Nintendo Switch'].map(t => (
+                      <div 
+                        key={t}
+                        onClick={() => { setUnit({...unit, type: t}); setIsTypeOpen(false); }}
+                        className={`p-4 text-sm cursor-pointer transition-colors flex items-center justify-between ${unit.type === t ? 'bg-playbox-accent/20 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'}`}
+                      >
+                        <span>{t}</span>
+                        {unit.type === t && <span className="text-playbox-accent font-bold">✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -249,31 +252,34 @@ export default function EditUnit() {
             <div className="relative">
               <div 
                 onClick={() => setIsStatusOpen(!isStatusOpen)}
-                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusOpen ? 'border-playbox-accent shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'border-white/10 hover:border-white/20'}`}
+                className={`w-full p-4 rounded-xl bg-black/20 border text-white text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusOpen ? 'border-playbox-accent shadow-[0_0_12px_rgba(37,99,235,0.4)] ring-1 ring-playbox-accent' : 'border-white/10 hover:border-white/20'}`}
               >
                 <div className="flex items-center">
-                  <span className={`w-2 h-2 rounded-full mr-2 ${unit.status === 'Ready' ? 'bg-playbox-ready' : unit.status === 'Disewa' ? 'bg-playbox-disewa' : 'bg-gray-400'}`}></span>
-                  <span>{unit.status === 'Disewa' ? 'Sedang Disewa' : unit.status}</span>
+                  <span className={`w-2 h-2 rounded-full mr-2 ${unit.status === 'Ready' ? 'bg-playbox-ready shadow-[0_0_8px_rgba(35,197,82,0.8)]' : unit.status === 'Disewa' ? 'bg-playbox-disewa shadow-[0_0_8px_rgba(37,99,235,0.8)]' : 'bg-gray-400'}`}></span>
+                  <span className="font-semibold">{unit.status === 'Disewa' ? 'Sedang Disewa' : unit.status}</span>
                 </div>
-                <span className={`text-[10px] transition-transform duration-300 ${isStatusOpen ? 'rotate-180 text-playbox-accent' : 'opacity-50'}`}>▼</span>
+                <span className={`text-[10px] text-playbox-accent transition-transform duration-300 ${isStatusOpen ? 'rotate-180' : 'opacity-60'}`}>▼</span>
               </div>
               
               {isStatusOpen && (
-                <div className="absolute top-full left-0 w-full mt-2 bg-[#10152B] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
-                  {['Ready', 'Disewa', 'Maintenance'].map(s => (
-                    <div 
-                      key={s}
-                      onClick={() => { setUnit({...unit, status: s}); setIsStatusOpen(false); }}
-                      className={`p-4 text-sm cursor-pointer transition-colors flex items-center justify-between ${unit.status === s ? 'bg-playbox-accent/10 text-playbox-accent font-semibold' : 'text-white/80 hover:bg-white/5'}`}
-                    >
-                      <div className="flex items-center">
-                        <span className={`w-2 h-2 rounded-full mr-2 ${s === 'Ready' ? 'bg-playbox-ready' : s === 'Disewa' ? 'bg-playbox-disewa' : 'bg-gray-400'}`}></span>
-                        {s === 'Disewa' ? 'Sedang Disewa' : s}
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsStatusOpen(false)}></div>
+                  <div className="absolute top-full left-0 w-full mt-2 bg-[#0D1122]/98 border border-white/20 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(0,0,0,0.8)] z-50 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
+                    {['Ready', 'Disewa', 'Maintenance'].map(s => (
+                      <div 
+                        key={s}
+                        onClick={() => { setUnit({...unit, status: s}); setIsStatusOpen(false); }}
+                        className={`p-4 text-sm cursor-pointer transition-colors flex items-center justify-between ${unit.status === s ? 'bg-playbox-accent/20 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'}`}
+                      >
+                        <div className="flex items-center">
+                          <span className={`w-2 h-2 rounded-full mr-2 ${s === 'Ready' ? 'bg-playbox-ready' : s === 'Disewa' ? 'bg-playbox-disewa' : 'bg-gray-400'}`}></span>
+                          <span>{s === 'Disewa' ? 'Sedang Disewa' : s}</span>
+                        </div>
+                        {unit.status === s && <span className="text-playbox-accent font-bold">✓</span>}
                       </div>
-                      {unit.status === s && <span className="text-playbox-accent">✓</span>}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -316,34 +322,37 @@ export default function EditUnit() {
                       </button>
 
                       {openUnitTierDropdown === idx && (
-                        <div className="absolute top-full left-0 w-full mt-2 bg-[#0D1122]/95 border border-white/15 rounded-2xl overflow-hidden shadow-2xl z-50 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
-                          {[
-                            { label: 'Jam', icon: '⏱️' },
-                            { label: 'Hari', icon: '📅' },
-                            { label: 'Minggu', icon: '📆' },
-                            { label: 'Bulan', icon: '🌙' }
-                          ].map((u) => {
-                            const isSelected = (tier.durationUnit || 'Jam') === u.label;
-                            return (
-                              <div
-                                key={u.label}
-                                onClick={() => {
-                                  handleTierChange(idx, 'durationUnit', u.label);
-                                  setOpenUnitTierDropdown(null);
-                                }}
-                                className={`p-3 text-xs cursor-pointer transition-colors flex items-center justify-between ${
-                                  isSelected ? 'bg-playbox-accent/15 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'
-                                }`}
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <span>{u.icon}</span>
-                                  <span>{u.label}</span>
-                                </span>
-                                {isSelected && <span className="text-[10px] text-playbox-accent font-black">✓</span>}
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenUnitTierDropdown(null)}></div>
+                          <div className="absolute top-full left-0 w-full mt-2 bg-[#0D1122]/98 border border-white/20 rounded-2xl overflow-hidden shadow-2xl z-50 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 divide-y divide-white/5">
+                            {[
+                              { label: 'Jam', icon: '⏱️' },
+                              { label: 'Hari', icon: '📅' },
+                              { label: 'Minggu', icon: '📆' },
+                              { label: 'Bulan', icon: '🌙' }
+                            ].map((u) => {
+                              const isSelected = (tier.durationUnit || 'Jam') === u.label;
+                              return (
+                                <div
+                                  key={u.label}
+                                  onClick={() => {
+                                    handleTierChange(idx, 'durationUnit', u.label);
+                                    setOpenUnitTierDropdown(null);
+                                  }}
+                                  className={`p-3 text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                                    isSelected ? 'bg-playbox-accent/20 text-playbox-accent font-bold' : 'text-white/80 hover:bg-white/10'
+                                  }`}
+                                >
+                                  <span className="flex items-center gap-1.5">
+                                    <span>{u.icon}</span>
+                                    <span>{u.label}</span>
+                                  </span>
+                                  {isSelected && <span className="text-[10px] text-playbox-accent font-black">✓</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -428,7 +437,7 @@ export default function EditUnit() {
         </div>
 
         {/* Floating Action Buttons */}
-        <div className="fixed bottom-[72px] w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-playbox-bg/80 backdrop-blur-xl border-t border-white/5 z-40">
+        <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 bg-[#0A0F1F]/95 backdrop-blur-xl border-t border-white/10 z-50 shadow-2xl">
           <div className="max-w-md mx-auto">
             <button 
               type="submit" 

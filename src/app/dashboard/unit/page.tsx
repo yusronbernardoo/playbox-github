@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -31,6 +31,7 @@ export default function UnitList() {
 
     // 1. Live state for active bookings
     let cachedActiveBookings: any[] = [];
+    let rawUnitsList: any[] = [];
 
     const applyStatusUpdate = (rawUnits: any[]) => {
       const now = Date.now();
@@ -85,15 +86,17 @@ export default function UnitList() {
         snapshot.forEach((d) => {
           cloudUnits.push({ ...d.data(), id: d.id });
         });
-        localStorage.setItem('playbox_mock_units', JSON.stringify(cloudUnits));
+        rawUnitsList = cloudUnits;
+        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(cloudUnits));
         setUnits(applyStatusUpdate(cloudUnits));
       } else {
         // If Firestore is empty, auto-sync existing local units to Firestore
-        const saved = localStorage.getItem('playbox_mock_units');
+        const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
         if (saved) {
           try {
             const localUnits = JSON.parse(saved);
             if (Array.isArray(localUnits) && localUnits.length > 0) {
+              rawUnitsList = localUnits;
               setUnits(applyStatusUpdate(localUnits));
               // Push to Cloud Firestore
               for (const u of localUnits) {
@@ -109,7 +112,7 @@ export default function UnitList() {
       }
     }, (err) => {
       console.warn('Unit listener err:', err);
-      const saved = localStorage.getItem('playbox_mock_units');
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
       if (saved) {
         try { setUnits(JSON.parse(saved)); } catch {}
       }
@@ -122,14 +125,23 @@ export default function UnitList() {
         .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
       
       cachedActiveBookings = activeBookings;
-      setUnits(prev => applyStatusUpdate(prev));
+      if (rawUnitsList.length > 0) {
+        setUnits(applyStatusUpdate(rawUnitsList));
+      }
     }, (err) => {
       console.warn('Unit bookings listener err:', err);
     });
 
+    const intervalId = setInterval(() => {
+      if (rawUnitsList.length > 0) {
+        setUnits(applyStatusUpdate(rawUnitsList));
+      }
+    }, 30000);
+
     return () => {
       unsubUnits();
       unsubBookings();
+      clearInterval(intervalId);
     };
   }, []);
 
@@ -221,7 +233,7 @@ export default function UnitList() {
                             }
                             const newUnits = units.filter(x => x.id !== unit.id);
                             setUnits(newUnits);
-                            localStorage.setItem('playbox_mock_units', JSON.stringify(newUnits));
+                            localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(newUnits));
                           }
                         }}
                         className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs hover:bg-red-500 hover:text-white transition-colors"

@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, getDocs, doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
@@ -57,7 +57,7 @@ export default function PelangganPage() {
     
     setIsLoading(true);
     try {
-      const savedBookings = localStorage.getItem('playbox_mock_bookings');
+      const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
       if (savedBookings) {
         const bookings = JSON.parse(savedBookings);
         const customerMap = new Map();
@@ -128,8 +128,8 @@ export default function PelangganPage() {
       
       setIsModalOpen(false);
     } catch (e) {
-      console.error(e);
-      alert("Gagal mengupdate status pelanggan.");
+      console.error("Gagal update blacklist:", e);
+      alert("Terjadi kesalahan saat memperbarui status blacklist.");
     }
     setIsSubmitting(false);
   };
@@ -140,83 +140,101 @@ export default function PelangganPage() {
   );
 
   return (
-    <div className="p-4 pb-28 min-h-screen flex flex-col relative">
-      <div className="ambient-glow"></div>
-
-      <div className="flex items-center justify-between mt-2 mb-6 relative z-10">
-        <div className="flex items-center">
-          <button onClick={() => router.back()} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-xl mr-4 hover:bg-white/10 transition-colors">
-            ←
-          </button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Database Pelanggan</h1>
-            <p className="text-xs text-playbox-text-secondary">CRM & Manajemen Blacklist</p>
-          </div>
+    <div className="p-4 space-y-6 pb-28 max-w-md mx-auto min-h-screen relative">
+      {/* Header */}
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center space-x-3">
+          <Link href="/dashboard/lainnya" className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+            <svg className="w-5 h-5 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          </Link>
+          <h1 className="text-xl font-bold text-white">Database Pelanggan</h1>
         </div>
-        
-        {customers.length > 0 && (
-          <button 
-            onClick={handleSyncData}
-            disabled={isLoading}
-            className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/5 flex items-center justify-center disabled:opacity-50"
-            title="Sinkronkan data lama"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        )}
+        <button 
+          onClick={handleSyncData}
+          disabled={isLoading}
+          className="text-xs bg-playbox-accent/10 hover:bg-playbox-accent/20 text-playbox-accent border border-playbox-accent/20 px-3 py-1.5 rounded-lg flex items-center space-x-1 font-medium transition-all"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          <span>Sync Data</span>
+        </button>
       </div>
 
-      <div className="mb-4 relative z-10">
-        <input 
-          type="text" 
-          placeholder="Cari nama atau nomor WA..." 
+      {/* Summary Widget */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-playbox-surface p-4 rounded-2xl border border-white/5 relative overflow-hidden">
+          <p className="text-xs text-playbox-text-secondary font-medium">Total Pelanggan</p>
+          <p className="text-2xl font-bold text-white mt-1">{customers.length}</p>
+        </div>
+        <div className="bg-playbox-surface p-4 rounded-2xl border border-white/5 relative overflow-hidden">
+          <p className="text-xs text-playbox-text-secondary font-medium">Pelanggan Diblacklist</p>
+          <p className="text-2xl font-bold text-red-400 mt-1">{customers.filter(c => c.isBlacklisted).length}</p>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Cari nama atau nomor WhatsApp..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-playbox-surface border border-[#2A3455] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-playbox-accent transition-colors"
+          onChange={e => setSearch(e.target.value)}
+          className="w-full bg-playbox-surface border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white placeholder-white/40 focus:outline-none focus:border-playbox-accent transition-colors"
         />
+        <svg className="w-4 h-4 text-white/40 absolute left-3.5 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
       </div>
 
-      <div className="flex-1 overflow-y-auto z-10 space-y-4">
+      {/* Customer List */}
+      <div className="space-y-3">
         {isLoading ? (
-          <div className="text-center py-10 text-playbox-text-secondary">Memuat data pelanggan...</div>
+          <div className="text-center py-12">
+            <div className="w-8 h-8 border-2 border-playbox-accent border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <p className="text-xs text-playbox-text-secondary">Memuat database...</p>
+          </div>
         ) : filteredCustomers.length === 0 ? (
-          <div className="text-center py-10 text-playbox-text-secondary bg-playbox-surface rounded-2xl border border-white/5 p-4">
-            <p className="mb-4">Belum ada data pelanggan yang tersimpan. Data akan bertambah otomatis saat pesanan baru dibuat.</p>
-            <button 
-              onClick={handleSyncData}
-              className="px-4 py-2 bg-playbox-accent hover:bg-playbox-accent-hover text-white rounded-xl font-bold text-xs transition-colors"
-            >
-              Sinkronkan Data Lama
-            </button>
+          <div className="text-center py-12 bg-playbox-surface rounded-2xl border border-white/5">
+            <p className="text-sm text-playbox-text-secondary">Tidak ada pelanggan ditemukan.</p>
           </div>
         ) : (
           filteredCustomers.map(c => (
-            <div key={c.id} className={`bg-playbox-surface border ${c.isBlacklisted ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-[#2A3455]'} rounded-xl p-4 transition-all duration-300`}>
-              <div className="flex justify-between items-start mb-3">
+            <div 
+              key={c.id} 
+              className={`p-4 rounded-2xl border transition-all ${
+                c.isBlacklisted 
+                  ? 'bg-red-500/5 border-red-500/20' 
+                  : 'bg-playbox-surface border-white/5 hover:border-white/10'
+              }`}
+            >
+              <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold text-lg text-white flex items-center">
-                    {c.name}
-                    {c.isBlacklisted && <span className="ml-2 text-xs bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full border border-red-500/30">BLACKLIST</span>}
-                  </h3>
-                  <p className="text-sm text-playbox-text-secondary">{c.phone || c.id}</p>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-bold text-white text-base">{c.name || 'Tanpa Nama'}</h3>
+                    {c.isBlacklisted && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                        BLACKLIST
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-playbox-text-secondary mt-0.5">{c.phone}</p>
                 </div>
-                <button 
+                <button
                   onClick={() => handleToggleBlacklist(c)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${c.isBlacklisted ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20'}`}
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all ${
+                    c.isBlacklisted
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                      : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                  }`}
                 >
                   {c.isBlacklisted ? 'Pulihkan' : 'Blacklist'}
                 </button>
               </div>
-              
-              <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/5">
+
+              <div className="mt-3 pt-3 border-t border-white/5 grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Total Sewa</p>
-                  <p className="font-bold text-white">{c.totalBookings || 0}x Transaksi</p>
+                  <span className="text-playbox-text-secondary block">Total Sewa</span>
+                  <p className="font-semibold text-white mt-0.5">{c.totalBookings || 1} Kali</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-playbox-text-secondary uppercase tracking-wider mb-1">Total Belanja</p>
+                  <span className="text-playbox-text-secondary block">Total Belanja</span>
                   <p className="font-bold text-playbox-accent">Rp {(c.totalSpent || 0).toLocaleString('id-ID')}</p>
                 </div>
               </div>

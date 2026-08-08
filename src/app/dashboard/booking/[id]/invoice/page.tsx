@@ -1,5 +1,5 @@
 'use client';
-import { getStoreId } from '@/lib/tenant';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
@@ -52,7 +52,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
 
       // 2. Fallback to localStorage
       if (!found) {
-        const savedBookings = localStorage.getItem('playbox_mock_bookings');
+        const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
         if (savedBookings) {
           const parsed = JSON.parse(savedBookings);
           found = parsed.find((b: any) => b.id === id);
@@ -117,7 +117,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     }
 
     // 2. Update localStorage
-    const savedBookings = localStorage.getItem('playbox_mock_bookings');
+    const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
     if (savedBookings) {
       let parsedBookings = JSON.parse(savedBookings);
       parsedBookings = parsedBookings.map((b: any) => {
@@ -132,12 +132,12 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         }
         return b;
       });
-      localStorage.setItem('playbox_mock_bookings', JSON.stringify(parsedBookings));
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(parsedBookings));
     }
 
     // 3. Release Unit to Ready
     if (booking?.unitId) {
-      const savedUnits = localStorage.getItem('playbox_mock_units');
+      const savedUnits = localStorage.getItem(getTenantStorageKey('playbox_mock_units'));
       if (savedUnits) {
         let parsedUnits = JSON.parse(savedUnits);
         parsedUnits = parsedUnits.map((u: any) => {
@@ -146,7 +146,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           }
           return u;
         });
-        localStorage.setItem('playbox_mock_units', JSON.stringify(parsedUnits));
+        localStorage.setItem(getTenantStorageKey('playbox_mock_units'), JSON.stringify(parsedUnits));
       }
     }
 

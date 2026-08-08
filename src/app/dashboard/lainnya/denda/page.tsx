@@ -1,41 +1,70 @@
 'use client';
+import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export default function DendaSettingsPage() {
   const router = useRouter();
 
-  const [tolerance, setTolerance] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('');
+  const [tolerance, setTolerance] = useState('15');
+  const [hourlyRate, setHourlyRate] = useState('20000');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('playbox_denda_rules');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setTolerance(parsed.tolerance.toString());
-      setHourlyRate(parsed.hourlyRate.toString());
-    } else {
-      setTolerance('15');
-      setHourlyRate('20000');
-    }
+    // 1. Real-time Firestore Listener
+    const unsubscribe = onSnapshot(doc(db, 'stores', getStoreId(), 'settings', 'denda'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.tolerance !== undefined) setTolerance(data.tolerance.toString());
+        if (data.hourlyRate !== undefined) setHourlyRate(data.hourlyRate.toString());
+        localStorage.setItem(getTenantStorageKey('playbox_denda_rules'), JSON.stringify(data));
+        return;
+      }
+
+      // Fallback to localStorage
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_denda_rules'));
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setTolerance(parsed.tolerance?.toString() || '15');
+          setHourlyRate(parsed.hourlyRate?.toString() || '20000');
+        } catch {}
+      }
+    }, (err) => {
+      console.warn('Firestore denda listener error:', err);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tolerance || !hourlyRate) return alert('Lengkapi semua kolom!');
     
+    setIsSaving(true);
     const rules = {
-      tolerance: parseInt(tolerance),
-      hourlyRate: parseInt(hourlyRate)
+      tolerance: parseInt(tolerance) || 0,
+      hourlyRate: parseInt(hourlyRate) || 0,
+      updatedAt: new Date().toISOString()
     };
     
-    localStorage.setItem('playbox_denda_rules', JSON.stringify(rules));
+    localStorage.setItem(getTenantStorageKey('playbox_denda_rules'), JSON.stringify(rules));
+
+    try {
+      await setDoc(doc(db, 'stores', getStoreId(), 'settings', 'denda'), rules, { merge: true });
+    } catch (err) {
+      console.error('Failed to sync denda settings to Firestore:', err);
+    }
+
+    setIsSaving(false);
     alert('Pengaturan Denda berhasil disimpan!');
     router.back();
   };
 
   return (
-    <div className="p-4 pb-28 min-h-screen flex flex-col relative">
+    <div className="p-4 pb-36 min-h-screen flex flex-col relative">
       <div className="ambient-glow"></div>
 
       {/* Header */}
@@ -90,9 +119,18 @@ export default function DendaSettingsPage() {
             </div>
           </div>
 
-          <button type="submit" className="w-full py-4 mt-4 bg-playbox-accent text-white rounded-xl text-sm font-bold shadow-lg shadow-playbox-accent/30 hover:shadow-playbox-accent/50 hover:bg-[#6C3FFF] transition-all active:scale-95">
-            Simpan Pengaturan
-          </button>
+          {/* Floating Action Button */}
+          <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 pb-6 sm:pb-4 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
+            <div className="max-w-md mx-auto">
+              <button 
+                type="submit" 
+                disabled={isSaving}
+                className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide disabled:opacity-50"
+              >
+                {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan Denda'}
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     </div>
