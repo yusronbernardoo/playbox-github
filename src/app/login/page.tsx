@@ -46,7 +46,7 @@ export default function LoginPage() {
             />
           </div>
           
-          <h1 className="text-xl sm:text-2xl font-black mb-3 tracking-tight leading-tight text-white relative inline-block px-4">
+          <h1 className="text-lg sm:text-xl font-black mb-3 tracking-tight leading-tight text-white relative inline-block px-4 whitespace-nowrap">
             Sistem Operasional Rental<br/>Playstation Professional
           </h1>
           <p className="text-[11px] text-white/50 font-medium tracking-wide max-w-[250px] mx-auto leading-relaxed">
@@ -92,7 +92,7 @@ export default function LoginPage() {
           <button 
             type="submit" 
             disabled={loading || !username || !password}
-            className="w-full py-3.5 bg-gradient-to-r from-playbox-gradient-start to-playbox-gradient-end text-white rounded-2xl font-bold shadow-[0_8px_30px_rgba(37,99,235,0.4)] tracking-wide hover:shadow-[0_8px_30px_rgba(37,99,235,0.6)] active:scale-95 transition-all text-sm mt-4 disabled:opacity-50 disabled:active:scale-100 disabled:shadow-none border border-white/10"
+            className="w-full py-3.5 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_8px_30px_rgba(37,99,235,0.4)] tracking-wide hover:shadow-[0_8px_30px_rgba(37,99,235,0.6)] hover:bg-blue-600 active:scale-95 transition-all text-sm mt-4 disabled:opacity-50 disabled:active:scale-100 disabled:shadow-none border border-blue-500/50"
           >
             {loading ? (
               <span className="flex items-center justify-center space-x-2">
