@@ -573,7 +573,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                     <span className="text-orange-500 text-[10px] shrink-0 mt-0.5">⚠️</span>
                     <div className="min-w-0">
                       <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-0.5 leading-tight">
-                        Telah dipesan untuk:
+                        AKAN DISEWA:
                       </p>
                       <p className="text-[9px] font-medium text-orange-400/90 leading-tight">
                         {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
