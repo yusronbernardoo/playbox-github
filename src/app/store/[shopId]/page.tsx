@@ -142,8 +142,10 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
   };
 
   useEffect(() => {
+    const storeId = unwrappedParams.shopId;
+
     // 1. Real-time Shop Profile Listener
-    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+    const unsubscribeShop = onSnapshot(doc(db, 'stores', storeId), (snap) => {
       let loadedProfile: any = null;
       if (snap.exists()) {
         loadedProfile = snap.data();
@@ -154,9 +156,9 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
       if (loadedProfile) {
         setShopProfile(loadedProfile);
-        setDisplayShopName(loadedProfile.brandName || unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+        setDisplayShopName(loadedProfile.brandName || storeId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       } else {
-        setDisplayShopName(unwrappedParams.shopId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+        setDisplayShopName(storeId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     }, (err) => {
       console.warn('Shop profile realtime sync error:', err);
@@ -201,7 +203,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       });
     };
 
-    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
+    const unsubscribeUnits = onSnapshot(collection(db, 'stores', storeId, 'units'), (snapshot) => {
       if (!snapshot.empty) {
         const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         rawUnitsList = liveUnits;
@@ -226,7 +228,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     // 2. Real-time Units & Active Bookings Listener
     // OPTIMIZED: Only fetch active bookings so it loads instantly!
     const activeBookingsQuery = query(
-      collection(db, 'bookings'),
+      collection(db, 'stores', storeId, 'bookings'),
       where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa', 'Sedang Dipakai'])
     );
     
@@ -257,21 +259,19 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     });
 
     // 3. Real-time Payment Methods Listener
-    const unsubscribePayments = onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (Array.isArray(data.list)) {
-          setPaymentMethods(data.list.filter((p: any) => p.active));
-          localStorage.setItem('playbox_payments', JSON.stringify(data.list));
-          return;
-        }
+    const unsubscribePayments = onSnapshot(collection(db, 'stores', storeId, 'payments'), (snapshot) => {
+      if (!snapshot.empty) {
+        const livePayments = snapshot.docs.map(doc => doc.data());
+        setPaymentMethods(livePayments.filter((p: any) => p.active !== false));
+        localStorage.setItem('playbox_payments', JSON.stringify(livePayments));
+        return;
       }
 
       const savedPayments = localStorage.getItem('playbox_payments');
       if (savedPayments) {
         try {
           const parsed = JSON.parse(savedPayments);
-          setPaymentMethods(parsed.filter((p: any) => p.active));
+          setPaymentMethods(parsed.filter((p: any) => p.active !== false));
         } catch (e) {
           console.error(e);
         }
@@ -421,7 +421,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
       // 1. Simpan ke Cloud Firestore (Real-Time)
       try {
-        await setDoc(doc(db, 'bookings', newId), newBooking);
+        const storeId = unwrappedParams.shopId;
+        await setDoc(doc(db, 'stores', storeId, 'bookings', newId), newBooking);
       } catch (err) {
         console.error('Gagal sync booking ke Firestore:', err);
       }
