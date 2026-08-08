@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
@@ -26,7 +27,7 @@ export default function NewBooking() {
       const cleanPhone = customer.phone.replace(/\D/g, '');
       if (cleanPhone.length >= 10) {
         try {
-          const docRef = doc(db, 'customers', cleanPhone);
+          const docRef = doc(db, 'stores', getStoreId(), 'customers', cleanPhone);
           const snap = await getDoc(docRef);
           if (snap.exists() && snap.data().isBlacklisted) {
             setBlacklistedCustomer(snap.data());
@@ -71,7 +72,7 @@ export default function NewBooking() {
     }
 
     // 2. Real-time Firestore units listener
-    const unsubUnits = onSnapshot(collection(db, 'units'), (snap) => {
+    const unsubUnits = onSnapshot(collection(db, 'stores', getStoreId(), 'units'), (snap) => {
       if (!snap.empty) {
         const cloudUnits: any[] = [];
         snap.forEach(d => {
@@ -279,13 +280,13 @@ export default function NewBooking() {
 
       // 1. Sync ke Cloud Firestore (Real-Time)
       try {
-        await setDoc(doc(db, 'bookings', newBooking.id), {
+        await setDoc(doc(db, 'stores', getStoreId(), 'bookings', newBooking.id), {
           ...newBooking,
           createdAt: new Date().toISOString()
         });
 
         // 1.5 Update Customer CRM Table
-        const custRef = doc(db, 'customers', customer.phone);
+        const custRef = doc(db, 'stores', getStoreId(), 'customers', customer.phone);
         const custSnap = await getDoc(custRef);
         if (custSnap.exists()) {
            await updateDoc(custRef, {

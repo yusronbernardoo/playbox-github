@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -78,7 +79,7 @@ export default function UnitList() {
     };
 
     // 2. Real-time Firestore units listener
-    const unsubUnits = onSnapshot(collection(db, 'units'), async (snapshot) => {
+    const unsubUnits = onSnapshot(collection(db, 'stores', getStoreId(), 'units'), async (snapshot) => {
       if (!snapshot.empty) {
         const cloudUnits: any[] = [];
         snapshot.forEach((d) => {
@@ -97,7 +98,7 @@ export default function UnitList() {
               // Push to Cloud Firestore
               for (const u of localUnits) {
                 if (u.id) {
-                  await setDoc(doc(db, 'units', u.id), u);
+                  await setDoc(doc(db, 'stores', getStoreId(), 'units', u.id), u);
                 }
               }
               return;
@@ -115,7 +116,7 @@ export default function UnitList() {
     });
 
     // 3. Real-time Firestore active bookings listener
-    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    const unsubBookings = onSnapshot(collection(db, 'stores', getStoreId(), 'bookings'), (snapshot) => {
       const activeBookings = snapshot.docs
         .map(d => d.data())
         .filter((b: any) => b.status && b.status !== 'Selesai' && b.status !== 'Dibatalkan');
@@ -213,7 +214,7 @@ export default function UnitList() {
                           if(confirm(`Yakin ingin menghapus unit "${unit.name}"?`)) {
                             try {
                               if (unit.id) {
-                                await deleteDoc(doc(db, 'units', unit.id));
+                                await deleteDoc(doc(db, 'stores', getStoreId(), 'units', unit.id));
                               }
                             } catch (err) {
                               console.error('Error deleting unit from Firestore:', err);

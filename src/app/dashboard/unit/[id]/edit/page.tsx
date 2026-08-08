@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -48,7 +49,7 @@ export default function EditUnit() {
       let found: any = null;
 
       try {
-        const snap = await getDoc(doc(db, 'units', id));
+        const snap = await getDoc(doc(db, 'stores', getStoreId(), 'units', id));
         if (snap.exists()) {
           found = { ...snap.data(), id: snap.id };
         }
@@ -137,7 +138,7 @@ export default function EditUnit() {
     // 1. Sync to Cloud Firestore
     try {
       if (id && typeof id === 'string') {
-        await setDoc(doc(db, 'units', id), cleanedUnit, { merge: true });
+        await setDoc(doc(db, 'stores', getStoreId(), 'units', id), cleanedUnit, { merge: true });
       }
     } catch (err) {
       console.error('Error updating unit in Firestore:', err);

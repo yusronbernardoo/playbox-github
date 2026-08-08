@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -65,7 +66,7 @@ export default function Keuangan() {
     loadFinancialData();
 
     // Setup Real-Time Listeners for Bookings and Expenses
-    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    const unsubscribeBookings = onSnapshot(collection(db, 'stores', getStoreId(), 'bookings'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudBookings: any[] = [];
         snapshot.forEach((d) => {

@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -14,7 +15,7 @@ export default function UnitDetail() {
     if (!id || typeof id !== 'string') return;
 
     // Real-time listener for unit details
-    const unsub = onSnapshot(doc(db, 'units', id), (snap) => {
+    const unsub = onSnapshot(doc(db, 'stores', getStoreId(), 'units', id), (snap) => {
       if (snap.exists()) {
         setUnit({ ...snap.data(), id: snap.id });
       } else {
@@ -46,7 +47,7 @@ export default function UnitDetail() {
     if (confirm('Yakin ingin menghapus unit ini? Tindakan ini tidak dapat dibatalkan.')) {
       try {
         if (id && typeof id === 'string') {
-          await deleteDoc(doc(db, 'units', id));
+          await deleteDoc(doc(db, 'stores', getStoreId(), 'units', id));
         }
       } catch (err) {
         console.error('Error deleting unit from Firestore:', err);

@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -29,7 +30,7 @@ export default function LainnyaPage() {
       } catch {}
     }
 
-    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+    const unsubscribeShop = onSnapshot(doc(db, 'stores', getStoreId()), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (data.brandName !== undefined) {

@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
@@ -40,7 +41,7 @@ export default function BookingList() {
     if (!confirmReject) return;
 
     try {
-      await deleteDoc(doc(db, 'bookings', id));
+      await deleteDoc(doc(db, 'stores', getStoreId(), 'bookings', id));
     } catch (err) {
       console.error('Error deleting from firestore:', err);
     }
@@ -49,7 +50,7 @@ export default function BookingList() {
   const handleConfirmDelete = async () => {
     if (deleteConfirmationWord.toUpperCase() !== 'HAPUS' || !bookingToDelete) return;
     try {
-      await deleteDoc(doc(db, 'bookings', bookingToDelete));
+      await deleteDoc(doc(db, 'stores', getStoreId(), 'bookings', bookingToDelete));
       setBookingToDelete(null);
       setDeleteConfirmationWord('');
     } catch (err) {

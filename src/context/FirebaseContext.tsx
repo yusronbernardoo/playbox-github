@@ -38,7 +38,20 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const initialLoadRef = useRef(true);
 
   useEffect(() => {
-    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    // 1. Get storeId from Auth
+    let storeId = 'demo'; // fallback
+    if (typeof window !== 'undefined') {
+      const auth = localStorage.getItem('playbox_auth');
+      if (auth) {
+        try {
+          const parsed = JSON.parse(auth);
+          if (parsed.storeId) storeId = parsed.storeId;
+        } catch (e) {}
+      }
+    }
+
+    const bookingsRef = collection(db, 'stores', storeId, 'bookings');
+    const unsubscribeBookings = onSnapshot(bookingsRef, (snapshot) => {
       setIsLoading(false);
       
       const cloudBookings: Booking[] = [];
@@ -79,7 +92,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     });
 
-    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+    const shopRef = doc(db, 'stores', storeId);
+    const unsubscribeShop = onSnapshot(shopRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setShopInfo(data);
@@ -90,7 +104,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
+    const unitsRef = collection(db, 'stores', storeId, 'units');
+    const unsubscribeUnits = onSnapshot(unitsRef, (snapshot) => {
       const cloudUnits: any[] = [];
       snapshot.forEach((docSnap) => {
         cloudUnits.push({ ...docSnap.data(), id: docSnap.id });

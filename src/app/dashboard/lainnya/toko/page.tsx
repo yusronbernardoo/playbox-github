@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -30,7 +31,7 @@ export default function PengaturanTokoPage() {
 
       // 1. Try fetching from Cloud Firestore
       try {
-        const snap = await getDoc(doc(db, 'settings', 'shop'));
+        const snap = await getDoc(doc(db, 'stores', getStoreId()));
         if (snap.exists()) {
           loaded = snap.data();
         }
@@ -128,7 +129,7 @@ export default function PengaturanTokoPage() {
 
     // 1. Save to Cloud Firestore
     try {
-      await setDoc(doc(db, 'settings', 'shop'), settingsData);
+      await setDoc(doc(db, 'stores', getStoreId()), settingsData);
       
       // 2. Save to localStorage only if Firestore succeeds
       localStorage.setItem('playbox_shop_settings', JSON.stringify(settingsData));

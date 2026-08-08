@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
@@ -40,7 +41,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       // 1. Fetch from Firestore
       try {
         if (id && typeof id === 'string') {
-          const docSnap = await getDoc(doc(db, 'bookings', id));
+          const docSnap = await getDoc(doc(db, 'stores', getStoreId(), 'bookings', id));
           if (docSnap.exists()) {
             found = { ...docSnap.data(), id: docSnap.id };
           }
@@ -102,7 +103,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     // 1. Update Firestore
     try {
       if (id && typeof id === 'string') {
-        await updateDoc(doc(db, 'bookings', id), {
+        await updateDoc(doc(db, 'stores', getStoreId(), 'bookings', id), {
           status: 'Selesai',
           statusColor: 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20',
           needAction: false,

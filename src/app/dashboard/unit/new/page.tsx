@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -80,7 +81,7 @@ export default function UnitNew() {
 
     try {
       // 1. Simpan ke Cloud Firestore (Real-Time across all devices)
-      await setDoc(doc(db, 'units', unitId), newUnit);
+      await setDoc(doc(db, 'stores', getStoreId(), 'units', unitId), newUnit);
     } catch (err) {
       console.error('Error saving unit to Firestore:', err);
     }

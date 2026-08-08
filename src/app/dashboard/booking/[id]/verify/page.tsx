@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -38,7 +39,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
 
   useEffect(() => {
     // 1. Real-time Firestore Document Listener
-    const unsubscribe = onSnapshot(doc(db, 'bookings', id), (docSnap) => {
+    const unsubscribe = onSnapshot(doc(db, 'stores', getStoreId(), 'bookings', id), (docSnap) => {
       if (docSnap.exists()) {
         const data: any = { ...docSnap.data(), id: docSnap.id };
         setBooking(data);
@@ -54,7 +55,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
     });
 
     // 2. Real-time Shop Settings Listener
-    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+    const unsubscribeShop = onSnapshot(doc(db, 'stores', getStoreId()), (snap) => {
       if (snap.exists()) {
         const s = snap.data();
         if (s.brandName) setBusinessName(s.brandName);
@@ -168,7 +169,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
 
     // 1. Sync ke Cloud Firestore
     try {
-      await updateDoc(doc(db, 'bookings', id), updatePayload);
+      await updateDoc(doc(db, 'stores', getStoreId(), 'bookings', id), updatePayload);
     } catch (err) {
       console.error('Failed to update status in Firestore:', err);
     }
@@ -297,7 +298,7 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
     if (!confirmReject) return;
 
     try {
-      await deleteDoc(doc(db, 'bookings', id));
+      await deleteDoc(doc(db, 'stores', getStoreId(), 'bookings', id));
     } catch (err) {
       console.error('Error deleting doc from firestore:', err);
     }

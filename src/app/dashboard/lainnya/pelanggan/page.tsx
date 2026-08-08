@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, getDocs, doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
@@ -36,7 +37,7 @@ export default function PelangganPage() {
   const loadCustomers = async () => {
     setIsLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'customers'));
+      const snap = await getDocs(collection(db, 'stores', getStoreId(), 'customers'));
       const data: any[] = [];
       snap.forEach(d => {
         data.push({ id: d.id, ...d.data() });
@@ -81,7 +82,7 @@ export default function PelangganPage() {
         }
         
         for (const [phone, data] of customerMap.entries()) {
-          const docRef = doc(db, 'customers', phone);
+          const docRef = doc(db, 'stores', getStoreId(), 'customers', phone);
           const snap = await getDoc(docRef);
           if (!snap.exists()) {
              await setDoc(docRef, {
@@ -113,7 +114,7 @@ export default function PelangganPage() {
     setIsSubmitting(true);
     try {
       const newStatus = !selectedCustomer.isBlacklisted;
-      const ref = doc(db, 'customers', selectedCustomer.id);
+      const ref = doc(db, 'stores', getStoreId(), 'customers', selectedCustomer.id);
       await updateDoc(ref, {
         isBlacklisted: newStatus,
         blacklistReason: newStatus ? blacklistReason : ''

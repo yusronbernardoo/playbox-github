@@ -16,14 +16,38 @@ export default function LoginPage() {
 
     // Simulate network delay
     setTimeout(() => {
+      // DUMMY AUTH MULTI-TENANT: username format is "storeId_role" (e.g. rentalA_bos)
+      if (password === '123' && username.includes('_')) {
+        const parts = username.split('_');
+        const storeId = parts[0];
+        const roleStr = parts[1].toLowerCase();
+        
+        let role = '';
+        let targetRoute = '/dashboard';
+        
+        if (roleStr === 'bos' || roleStr === 'owner') {
+          role = 'owner';
+        } else if (roleStr === 'kasir') {
+          role = 'kasir';
+          targetRoute = '/dashboard/booking';
+        }
+
+        if (role) {
+          localStorage.setItem('playbox_auth', JSON.stringify({ username, role, storeId }));
+          router.push(targetRoute);
+          return;
+        }
+      }
+      
+      // Fallback old single-tenant testing (defaults to storeId: 'demo')
       if (username === 'bos' && password === '123') {
-        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'bos', role: 'owner' }));
+        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'bos', role: 'owner', storeId: 'demo' }));
         router.push('/dashboard');
       } else if (username === 'kasir' && password === '123') {
-        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'kasir', role: 'kasir' }));
+        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'kasir', role: 'kasir', storeId: 'demo' }));
         router.push('/dashboard/booking');
       } else {
-        setError('Username atau Password salah!');
+        setError('Username tidak terdaftar atau format salah! (Coba: namatoko_bos)');
         setLoading(false);
       }
     }, 800);
@@ -105,7 +129,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 pt-4 border-t border-white/5 text-center relative z-10">
-          <p className="text-[10px] text-white/30 font-medium">Versi Demo 0.1.0 (dummy: bos/123 atau kasir/123)</p>
+          <p className="text-[10px] text-white/30 font-medium">Versi Multi-Tenant 1.0 (Contoh: rentalA_bos / 123)</p>
         </div>
       </div>
     </div>

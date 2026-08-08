@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -26,7 +27,7 @@ export default function CustomerDetails() {
     }
     try {
       const phoneNum = phone.replace(/\D/g, '');
-      const custDoc = await getDoc(doc(db, 'customers', phoneNum));
+      const custDoc = await getDoc(doc(db, 'stores', getStoreId(), 'customers', phoneNum));
       if (custDoc.exists() && custDoc.data().isBlacklisted) {
         setBlacklistedCustomer({
           isBlacklisted: true,

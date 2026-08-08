@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DayPicker } from 'react-day-picker';
@@ -143,7 +144,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
   useEffect(() => {
     // 1. Real-time Shop Profile Listener
-    const unsubscribeShop = onSnapshot(doc(db, 'settings', 'shop'), (snap) => {
+    const unsubscribeShop = onSnapshot(doc(db, 'stores', unwrappedParams.shopId), (snap) => {
       let loadedProfile: any = null;
       if (snap.exists()) {
         loadedProfile = snap.data();
@@ -201,7 +202,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       });
     };
 
-    const unsubscribeUnits = onSnapshot(collection(db, 'units'), (snapshot) => {
+    const unsubscribeUnits = onSnapshot(collection(db, 'stores', unwrappedParams.shopId, 'units'), (snapshot) => {
       if (!snapshot.empty) {
         const liveUnits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         rawUnitsList = liveUnits;
@@ -226,7 +227,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     // 2. Real-time Units & Active Bookings Listener
     // OPTIMIZED: Only fetch active bookings so it loads instantly!
     const activeBookingsQuery = query(
-      collection(db, 'bookings'),
+      collection(db, 'stores', unwrappedParams.shopId, 'bookings'),
       where('status', 'in', ['Perlu Verifikasi', 'Menunggu Pembayaran', 'Disewa', 'Sedang Dipakai'])
     );
     
@@ -421,7 +422,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
       // 1. Simpan ke Cloud Firestore (Real-Time)
       try {
-        await setDoc(doc(db, 'bookings', newId), newBooking);
+        await setDoc(doc(db, 'stores', getStoreId(), 'bookings', newId), newBooking);
       } catch (err) {
         console.error('Gagal sync booking ke Firestore:', err);
       }

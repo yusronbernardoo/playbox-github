@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useState, useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { useParams, useRouter } from 'next/navigation';
@@ -33,7 +34,7 @@ export default function TimelineBooking() {
     const loadShopAndPayments = async () => {
       try {
         // Shop Profile
-        const shopSnap = await getDoc(doc(db, 'settings', 'shop'));
+        const shopSnap = await getDoc(doc(db, 'stores', getStoreId()));
         if (shopSnap.exists()) {
           const s = shopSnap.data();
           if (s.brandName) setBusinessName(s.brandName);
@@ -63,7 +64,7 @@ export default function TimelineBooking() {
     if (!id || typeof id !== 'string') return;
 
     // 1. Real-time Firestore document listener
-    const unsubscribe = onSnapshot(doc(db, 'bookings', id), (docSnap) => {
+    const unsubscribe = onSnapshot(doc(db, 'stores', getStoreId(), 'bookings', id), (docSnap) => {
       let b: any = null;
       if (docSnap.exists()) {
         b = { ...docSnap.data(), id: docSnap.id };
@@ -196,7 +197,7 @@ export default function TimelineBooking() {
       // 1. Update Firestore
       try {
         if (id && typeof id === 'string') {
-          await updateDoc(doc(db, 'bookings', id), {
+          await updateDoc(doc(db, 'stores', getStoreId(), 'bookings', id), {
             status: cleanStatus,
             statusColor: color,
             needAction: false,

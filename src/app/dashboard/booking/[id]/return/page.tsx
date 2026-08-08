@@ -1,4 +1,5 @@
 'use client';
+import { getStoreId } from '@/lib/tenant';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -26,7 +27,7 @@ export default function ReturnCheck() {
       // 1. Fetch from Firestore
       try {
         if (id && typeof id === 'string') {
-          const docRef = doc(db, 'bookings', id);
+          const docRef = doc(db, 'stores', getStoreId(), 'bookings', id);
           const snap = await getDoc(docRef);
           if (snap.exists()) {
             b = { ...snap.data(), id: snap.id };
@@ -137,7 +138,7 @@ export default function ReturnCheck() {
     // 1. Update Firestore
     try {
       if (id && typeof id === 'string') {
-        await updateDoc(doc(db, 'bookings', id), {
+        await updateDoc(doc(db, 'stores', getStoreId(), 'bookings', id), {
           status: 'Selesai',
           statusColor: 'bg-playbox-ready/15 text-playbox-ready border border-playbox-ready/20',
           needAction: false,
@@ -172,7 +173,7 @@ export default function ReturnCheck() {
 
     if (bookingData?.unitId) {
       try {
-        await updateDoc(doc(db, 'units', bookingData.unitId), {
+        await updateDoc(doc(db, 'stores', getStoreId(), 'units', bookingData.unitId), {
           status: 'Ready',
           statusColor: 'bg-playbox-ready/10 text-playbox-ready hover:bg-playbox-ready/20',
           updatedAt: new Date().toISOString()
