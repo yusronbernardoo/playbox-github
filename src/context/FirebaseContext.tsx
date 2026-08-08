@@ -129,13 +129,30 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setShopInfo(JSON.parse(e.newValue));
       }
     };
+    
+    // Custom event to force sync in the SAME tab immediately
+    const handleLocalSync = (e: CustomEvent) => {
+      const { key, newValue } = e.detail;
+      if (key === 'playbox_mock_bookings' && newValue) {
+        setBookings(JSON.parse(newValue));
+      }
+      if (key === 'playbox_mock_units' && newValue) {
+        setUnits(JSON.parse(newValue));
+      }
+      if (key === 'playbox_shop_settings' && newValue) {
+        setShopInfo(JSON.parse(newValue));
+      }
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('local-sync', handleLocalSync as EventListener);
 
     return () => {
       unsubscribeBookings();
       unsubscribeShop();
       unsubscribeUnits();
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('local-sync', handleLocalSync as EventListener);
     };
   }, []);
 

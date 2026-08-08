@@ -95,7 +95,9 @@ export default function UnitNew() {
       } catch {}
     }
     units.push(newUnit);
-    localStorage.setItem('playbox_mock_units', JSON.stringify(units));
+    const newUnitsString = JSON.stringify(units);
+    localStorage.setItem('playbox_mock_units', newUnitsString);
+    window.dispatchEvent(new CustomEvent('local-sync', { detail: { key: 'playbox_mock_units', newValue: newUnitsString } }));
 
     setIsSubmitting(false);
     alert("Unit Baru Berhasil Ditambahkan!");

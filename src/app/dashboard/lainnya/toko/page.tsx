@@ -137,7 +137,10 @@ export default function PengaturanTokoPage() {
       let oldData = {};
       try { if (oldRaw) oldData = JSON.parse(oldRaw); } catch(e) {}
 
-      localStorage.setItem('playbox_shop_settings', JSON.stringify({ ...oldData, ...settingsData }));
+      const newSettingsString = JSON.stringify({ ...oldData, ...settingsData });
+      localStorage.setItem('playbox_shop_settings', newSettingsString);
+      window.dispatchEvent(new CustomEvent('local-sync', { detail: { key: 'playbox_shop_settings', newValue: newSettingsString } }));
+      
       setSlug(finalSlug);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
