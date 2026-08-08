@@ -118,10 +118,24 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (saved) setUnits(JSON.parse(saved));
     });
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'playbox_mock_bookings' && e.newValue) {
+        setBookings(JSON.parse(e.newValue));
+      }
+      if (e.key === 'playbox_mock_units' && e.newValue) {
+        setUnits(JSON.parse(e.newValue));
+      }
+      if (e.key === 'playbox_shop_settings' && e.newValue) {
+        setShopInfo(JSON.parse(e.newValue));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       unsubscribeBookings();
       unsubscribeShop();
       unsubscribeUnits();
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
