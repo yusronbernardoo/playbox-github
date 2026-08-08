@@ -8,12 +8,12 @@ import { QRCodeCanvas } from 'qrcode.react';
 
 export default function PengaturanTokoPage() {
   const router = useRouter();
-  const [brandName, setBrandName] = useState('PlayBox Malang');
-  const [slug, setSlug] = useState('playbox-malang');
-  const [phone, setPhone] = useState('081234567890');
-  const [instagram, setInstagram] = useState('playbox.rental');
-  const [address, setAddress] = useState('Jl. Soekarno Hatta No. 12, Malang');
-  const [bio, setBio] = useState('Pusat Sewa PlayStation 5 & PS4 Premium, Unit Bersih & Game Update.');
+  const [brandName, setBrandName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [phone, setPhone] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [address, setAddress] = useState('');
+  const [bio, setBio] = useState('');
   const [logo, setLogo] = useState<string>('');
   const [isSaved, setIsSaved] = useState(false);
   const [domain, setDomain] = useState('');
@@ -27,11 +27,12 @@ export default function PengaturanTokoPage() {
     }
     
     const loadSettings = async () => {
+      const currentStoreId = getStoreId();
       let loaded: any = null;
 
       // 1. Try fetching from Cloud Firestore
       try {
-        const snap = await getDoc(doc(db, 'stores', getStoreId()));
+        const snap = await getDoc(doc(db, 'stores', currentStoreId));
         if (snap.exists()) {
           loaded = snap.data();
         }
@@ -43,19 +44,41 @@ export default function PengaturanTokoPage() {
       if (!loaded) {
         const local = localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
         if (local) {
-          loaded = JSON.parse(local);
+          try {
+            loaded = JSON.parse(local);
+          } catch {}
         }
       }
 
-      if (loaded) {
-        setBrandName(loaded.brandName || 'PlayBox Malang');
-        setSlug(loaded.slug || 'playbox-malang');
-        setPhone(loaded.phone || '081234567890');
-        setInstagram(loaded.instagram || '');
-        setAddress(loaded.address || 'Jl. Soekarno Hatta No. 12, Malang');
-        setBio(loaded.bio || 'Pusat Sewa PlayStation 5 & PS4 Premium, Unit Bersih & Game Update.');
-        setLogo(loaded.logo || '');
+      const activeBrandName = loaded?.brandName || (currentStoreId === 'demo' ? 'PlayBox Malang' : currentStoreId);
+      const computedDefaultSlug = loaded?.slug || (activeBrandName ? activeBrandName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : currentStoreId);
+
+      setBrandName(activeBrandName);
+      setSlug(computedDefaultSlug);
+      setPhone(loaded?.phone || '');
+      setInstagram(loaded?.instagram || '');
+      setAddress(loaded?.address || '');
+      setBio(loaded?.bio || (currentStoreId === 'demo' ? 'Pusat Sewa PlayStation 5 & PS4 Premium, Unit Bersih & Game Update.' : ''));
+      setLogo(loaded?.logo || '');
+
+      // Auto-repair: If the store didn't have a slug in Firestore or store_slugs mapping, sync it automatically now
+      if (computedDefaultSlug && (!loaded?.slug || currentStoreId !== 'demo')) {
+        try {
+          await setDoc(doc(db, 'store_slugs', computedDefaultSlug), {
+            storeId: currentStoreId,
+            slug: computedDefaultSlug,
+            brandName: activeBrandName,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+
+          if (!loaded?.slug) {
+            await setDoc(doc(db, 'stores', currentStoreId), { slug: computedDefaultSlug }, { merge: true });
+          }
+        } catch (syncErr) {
+          console.warn('Auto-repair slug mapping warning:', syncErr);
+        }
       }
+
       setLoading(false);
     };
 

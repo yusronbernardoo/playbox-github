@@ -37,17 +37,28 @@ export default function RegisterPage() {
       // Create new store document with 7 days trial
       const now = new Date();
       const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const generatedSlug = formData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || storeId;
 
-      await setDoc(storeRef, {
+      const shopData = {
         brandName: formData.businessName,
+        slug: generatedSlug,
         phone: formData.phone,
         password: formData.password, // In a real app, hash this!
         status: 'trial',
         createdAt: now.toISOString(),
         validUntil: validUntil.toISOString()
-      });
+      };
 
-      // Also create empty collections just to be safe, though Firestore doesn't require it
+      await setDoc(storeRef, shopData);
+
+      // Create slug mapping so /store/[slug] works immediately
+      await setDoc(doc(db, 'store_slugs', generatedSlug), {
+        storeId: storeId,
+        slug: generatedSlug,
+        brandName: formData.businessName,
+        updatedAt: now.toISOString()
+      }, { merge: true });
+
       // Automatically log them in
       const fullUsername = `${storeId}_bos`;
       localStorage.setItem('playbox_auth', JSON.stringify({ 
@@ -55,6 +66,9 @@ export default function RegisterPage() {
         role: 'owner', 
         storeId: storeId 
       }));
+
+      // Cache tenant settings
+      localStorage.setItem(`playbox_shop_settings_${storeId}`, JSON.stringify(shopData));
 
       router.push('/dashboard');
     } catch (err: any) {
