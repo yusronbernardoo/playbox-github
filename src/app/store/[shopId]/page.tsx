@@ -617,7 +617,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         <div className="pt-10 pb-4 text-center border-t border-white/5 mt-8">
           <p className="text-[10px] text-white/40 font-medium mb-2 uppercase tracking-widest">Powered by</p>
           <a href="https://rentervaplay.com" target="_blank" rel="noopener noreferrer" className="inline-block hover:scale-105 transition-transform">
-            <img src="/renterva-logo.png" alt="Renterva Play" className="h-6 object-contain opacity-70 hover:opacity-100 transition-opacity drop-shadow-[0_0_10px_rgba(37,99,235,0.3)]" />
+            <img src="/renterva-logo.png" alt="Renterva Play" className="h-10 object-contain opacity-80 hover:opacity-100 transition-opacity drop-shadow-[0_0_10px_rgba(37,99,235,0.3)]" />
           </a>
         </div>
       </main>
