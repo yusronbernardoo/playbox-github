@@ -67,26 +67,26 @@ export default function Keuangan() {
 
     // Setup Real-Time Listeners for Bookings and Expenses
     const unsubscribeBookings = onSnapshot(collection(db, 'stores', getStoreId(), 'bookings'), (snapshot) => {
+      const cloudBookings: any[] = [];
       if (!snapshot.empty) {
-        const cloudBookings: any[] = [];
         snapshot.forEach((d) => {
           cloudBookings.push({ id: d.id, ...d.data() });
         });
-        localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
-        loadFinancialData();
       }
+      localStorage.setItem('playbox_mock_bookings', JSON.stringify(cloudBookings));
+      loadFinancialData();
     }, (err) => console.warn('Bookings listener fallback:', err));
 
-    const unsubscribeExpenses = onSnapshot(collection(db, 'expenses'), (snapshot) => {
+    const unsubscribeExpenses = onSnapshot(collection(db, 'stores', getStoreId(), 'expenses'), (snapshot) => {
+      const cloudExpenses: any[] = [];
       if (!snapshot.empty) {
-        const cloudExpenses: any[] = [];
         snapshot.forEach((d) => {
           cloudExpenses.push({ id: d.id, ...d.data() });
         });
         cloudExpenses.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        localStorage.setItem('playbox_expenses', JSON.stringify(cloudExpenses));
-        loadFinancialData();
       }
+      localStorage.setItem('playbox_expenses', JSON.stringify(cloudExpenses));
+      loadFinancialData();
     }, (err) => console.warn('Expenses listener fallback:', err));
 
     return () => {
@@ -201,7 +201,7 @@ export default function Keuangan() {
       savedExpenses = JSON.parse(localExp);
     } else {
       try {
-        const expSnap = await getDocs(collection(db, 'expenses'));
+        const expSnap = await getDocs(collection(db, 'stores', getStoreId(), 'expenses'));
         if (!expSnap.empty) {
           expSnap.forEach(d => savedExpenses.push({ id: d.id, ...d.data() }));
           localStorage.setItem('playbox_expenses', JSON.stringify(savedExpenses));
@@ -244,7 +244,7 @@ export default function Keuangan() {
 
     // 1. Sync to Firestore
     try {
-      await setDoc(doc(db, 'expenses', newId), item);
+      await setDoc(doc(db, 'stores', getStoreId(), 'expenses', newId), item);
     } catch (err) {
       console.error('Failed adding expense to Firestore:', err);
     }
@@ -377,7 +377,7 @@ export default function Keuangan() {
     try {
       // 1. Delete from Firestore
       try {
-        await deleteDoc(doc(db, 'expenses', expenseToDelete.id));
+        await deleteDoc(doc(db, 'stores', getStoreId(), 'expenses', expenseToDelete.id));
       } catch (err) {
         console.error('Failed deleting expense from Firestore:', err);
       }
