@@ -532,7 +532,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       )}
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-lg mx-auto p-4 space-y-5 pb-24">
+      <main className="relative z-10 max-w-lg mx-auto p-4 space-y-5 pb-8">
         <div className="flex justify-between items-end mb-1">
           <h2 className="text-base font-bold text-white tracking-tight">Katalog Unit PlayStation</h2>
           <span className="text-[11px] text-white/60 font-semibold">{units.filter(u => u.status === 'Ready').length} Unit Tersedia</span>
@@ -611,6 +611,14 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
               </div>
             </div>
           ))}
+        </div>
+
+        {/* SaaS Footer */}
+        <div className="pt-10 pb-4 text-center border-t border-white/5 mt-8">
+          <p className="text-[10px] text-white/40 font-medium mb-2 uppercase tracking-widest">Powered by</p>
+          <a href="https://rentervaplay.com" target="_blank" rel="noopener noreferrer" className="inline-block hover:scale-105 transition-transform">
+            <img src="/renterva-logo.png" alt="Renterva Play" className="h-6 object-contain opacity-70 hover:opacity-100 transition-opacity drop-shadow-[0_0_10px_rgba(37,99,235,0.3)]" />
+          </a>
         </div>
       </main>
 

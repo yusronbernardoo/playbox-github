@@ -37,15 +37,24 @@ export default function LoginPage() {
         {/* Subtle hover glow effect behind the card */}
         <div className="absolute -inset-0.5 bg-gradient-to-br from-playbox-gradient-start/30 to-playbox-gradient-end/30 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity duration-1000 blur-xl -z-10"></div>
         
-        <div className="text-center mb-8 relative z-10">
-          <div className="mx-auto w-32 h-20 mb-4 relative flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+        <div className="text-center mb-10 relative z-10">
+          <div className="mx-auto w-32 h-14 mb-8 relative flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
             <img 
               src="/renterva-logo.png" 
               alt="Renterva Play Logo" 
               className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(37,99,235,0.4)]"
             />
           </div>
-          <p className="text-xs text-playbox-text-secondary font-medium tracking-wide">Atur Booking PS Tanpa Ribet.</p>
+          
+          <h1 
+            className="text-2xl font-black mb-4 tracking-tight leading-tight text-white relative inline-block px-4"
+            style={{ textShadow: '-2px 0px 0px rgba(239,68,68,0.7), 2px 0px 0px rgba(59,130,246,0.7)' }}
+          >
+            Sistem Operasional Rental<br/>PlayStation Profesional
+          </h1>
+          <p className="text-xs text-white/50 font-medium tracking-wide max-w-[250px] mx-auto leading-relaxed">
+            Kelola rental Anda dengan mudah dalam satu platform cerdas.
+          </p>
         </div>
 
         {error && (

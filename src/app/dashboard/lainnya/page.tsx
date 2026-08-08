@@ -51,7 +51,7 @@ export default function LainnyaPage() {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-24 h-full">
+    <div className="p-4 space-y-6 h-full">
       {/* Header */}
       <div className="flex items-center mt-2 mb-6">
         <h1 className="text-xl font-bold">Lainnya</h1>

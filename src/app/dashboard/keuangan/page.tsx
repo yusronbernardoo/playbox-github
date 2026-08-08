@@ -406,7 +406,7 @@ export default function Keuangan() {
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
-    <div className="p-4 space-y-7 pb-24 relative min-h-screen">
+    <div className="p-4 space-y-7 relative min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-end mt-2 z-20">
         <div>

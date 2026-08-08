@@ -140,7 +140,7 @@ export default function UnitList() {
   });
 
   return (
-    <div className="p-4 space-y-6 pb-28 h-full">
+    <div className="p-4 space-y-6 h-full">
       {/* Header */}
       <div className="flex justify-between items-center mt-2">
         <h1 className="text-2xl font-bold tracking-tight">Daftar Unit</h1>

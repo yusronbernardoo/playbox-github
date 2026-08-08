@@ -309,7 +309,7 @@ export default function DashboardHome({ customUnits }: { customUnits?: any[] }) 
   ];
 
   return (
-    <div className="p-4 space-y-7 pb-24 relative">
+    <div className="p-4 space-y-7 relative">
       <div className="ambient-glow"></div>
       
       {/* Header with Shop Logo */}
