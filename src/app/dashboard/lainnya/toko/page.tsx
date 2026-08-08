@@ -160,6 +160,11 @@ export default function PengaturanTokoPage() {
           storeId: getStoreId(),
           slug: finalSlug,
           brandName: brandName || 'Nama Toko',
+          logo: logo || '',
+          phone: phone || '',
+          instagram: cleanIg,
+          address: address || '',
+          bio: bio || '',
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }
@@ -171,7 +176,9 @@ export default function PengaturanTokoPage() {
 
       const newSettingsString = JSON.stringify({ ...oldData, ...settingsData });
       localStorage.setItem(getTenantStorageKey('playbox_shop_settings'), newSettingsString);
+      localStorage.setItem(`playbox_shop_settings_${finalSlug}`, newSettingsString);
       window.dispatchEvent(new CustomEvent('local-sync', { detail: { key: 'playbox_shop_settings', newValue: newSettingsString } }));
+      window.dispatchEvent(new CustomEvent('local-sync', { detail: { key: `playbox_shop_settings_${finalSlug}`, newValue: newSettingsString } }));
       
       setSlug(finalSlug);
       setIsSaved(true);

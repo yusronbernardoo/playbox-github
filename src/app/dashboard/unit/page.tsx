@@ -47,7 +47,8 @@ export default function UnitList() {
         const unitBookings = cachedActiveBookings.filter(b => b.unitId === u.id || b.unit === u.name);
         
         let isCurrentlyBusy = false;
-        let nextBooking = null;
+        let currentRental: any = null;
+        let nextBooking: any = null;
         let nextBookingStartMs = Infinity;
 
         unitBookings.forEach(b => {
@@ -58,8 +59,9 @@ export default function UnitList() {
 
           if (now >= startMs && now <= endMs) {
             isCurrentlyBusy = true;
+            currentRental = { ...b, startMs, endMs, durHours };
           } else if (startMs > now && startMs < nextBookingStartMs) {
-            nextBooking = b;
+            nextBooking = { ...b, startMs, endMs, durHours };
             nextBookingStartMs = startMs;
           }
         });
@@ -74,7 +76,8 @@ export default function UnitList() {
           statusColor: finalIsBusy 
             ? 'bg-playbox-disewa/10 text-playbox-disewa border border-playbox-disewa/20' 
             : 'bg-playbox-ready/10 text-playbox-ready border border-playbox-ready/20',
-          nextBooking: !finalIsBusy && nextBooking ? nextBooking : null
+          currentRental,
+          nextBooking: nextBooking
         };
       });
     };
@@ -266,15 +269,27 @@ export default function UnitList() {
                 </div>
               )}
 
+              {unit.currentRental && (
+                <div className="mt-3 bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl flex items-start gap-2 shadow-inner">
+                  <span className="text-red-400 text-xs shrink-0 mt-0.5">🔴</span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-0.5">Sedang Disewa: {unit.currentRental.customer}</p>
+                    <p className="text-[10px] font-medium text-red-300/90 truncate">
+                      🗓️ Sampai: {new Date(unit.currentRental.isoEnd || unit.currentRental.endMs).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {unit.nextBooking && (
                 <div className="mt-3 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-xl flex items-start gap-2 shadow-inner">
                   <span className="text-yellow-500 text-xs shrink-0 mt-0.5">⚠️</span>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider mb-0.5">Akan Disewa: {unit.nextBooking.customer}</p>
                     <p className="text-[10px] font-medium text-yellow-500/80 truncate">
-                      🗓️ {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
+                      🗓️ {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime || unit.nextBooking.startMs).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
                       <span className="opacity-70 ml-1">
-                        (Selama {formatSmartDuration(Number(unit.nextBooking.durationHours || unit.nextBooking.duration || 24))})
+                        (Selama {formatSmartDuration(Number(unit.nextBooking.durationHours || unit.nextBooking.duration || unit.nextBooking.durHours || 24))})
                       </span>
                     </p>
                   </div>

@@ -150,13 +150,24 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     let unsubSlugDoc: (() => void) | null = null;
     let unsubSlugQuery: (() => void) | null = null;
 
+    // Cek cache lokal terlebih dahulu untuk instant rendering (0ms delay)
+    const cachedLocal = localStorage.getItem(`playbox_shop_settings_${unwrappedParams.shopId}`) || 
+                        localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
+    if (cachedLocal) {
+      try {
+        const parsed = JSON.parse(cachedLocal);
+        setShopProfile(prev => ({ ...prev, ...parsed }));
+        if (parsed.brandName) setDisplayShopName(parsed.brandName);
+      } catch {}
+    }
+
     // A. Cek langsung jika params.shopId adalah storeId asli
     unsubDirect = onSnapshot(doc(db, 'stores', unwrappedParams.shopId), (snap) => {
       if (snap.exists()) {
         setEffectiveStoreId(unwrappedParams.shopId);
         effectiveStoreIdRef.current = unwrappedParams.shopId;
         const data = snap.data();
-        setShopProfile(data);
+        setShopProfile(prev => ({ ...prev, ...data }));
         setDisplayShopName(data.brandName || unwrappedParams.shopId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     }, (err) => {
@@ -165,10 +176,17 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
     // B. Cek mapping di koleksi store_slugs
     unsubSlugDoc = onSnapshot(doc(db, 'store_slugs', unwrappedParams.shopId), (snap) => {
-      if (snap.exists() && snap.data()?.storeId) {
-        const targetId = snap.data().storeId;
-        setEffectiveStoreId(targetId);
-        effectiveStoreIdRef.current = targetId;
+      if (snap.exists()) {
+        const sData = snap.data();
+        if (sData?.storeId) {
+          const targetId = sData.storeId;
+          setEffectiveStoreId(targetId);
+          effectiveStoreIdRef.current = targetId;
+        }
+        setShopProfile(prev => ({ ...prev, ...sData }));
+        if (sData?.brandName) {
+          setDisplayShopName(sData.brandName);
+        }
       }
     }, (err) => {
       console.warn('Slug doc mapping check error:', err);
@@ -182,17 +200,37 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         setEffectiveStoreId(targetDoc.id);
         effectiveStoreIdRef.current = targetDoc.id;
         const data = targetDoc.data();
-        setShopProfile(data);
+        setShopProfile(prev => ({ ...prev, ...data }));
         setDisplayShopName(data.brandName || unwrappedParams.shopId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     }, (err) => {
       console.warn('Slug query check error:', err);
     });
 
+    // D. Local storage & event listener for instant multi-tab sync
+    const handleLocalSync = (e: any) => {
+      const key = e.detail?.key || e.key;
+      if (key && (key.includes('playbox_shop_settings') || key.includes(unwrappedParams.shopId))) {
+        try {
+          const val = e.detail?.newValue || (typeof window !== 'undefined' ? localStorage.getItem(key) : null);
+          if (val) {
+            const parsed = JSON.parse(val);
+            setShopProfile(prev => ({ ...prev, ...parsed }));
+            if (parsed.brandName) setDisplayShopName(parsed.brandName);
+          }
+        } catch {}
+      }
+    };
+
+    window.addEventListener('local-sync', handleLocalSync);
+    window.addEventListener('storage', handleLocalSync);
+
     return () => {
       if (unsubDirect) unsubDirect();
       if (unsubSlugDoc) unsubSlugDoc();
       if (unsubSlugQuery) unsubSlugQuery();
+      window.removeEventListener('local-sync', handleLocalSync);
+      window.removeEventListener('storage', handleLocalSync);
     };
   }, [unwrappedParams.shopId]);
 
@@ -204,7 +242,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     const unsubscribeShop = onSnapshot(doc(db, 'stores', effectiveStoreId), (snap) => {
       if (snap.exists()) {
         const loadedProfile = snap.data();
-        setShopProfile(loadedProfile);
+        setShopProfile(prev => ({ ...prev, ...loadedProfile }));
         setDisplayShopName(loadedProfile.brandName || unwrappedParams.shopId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     }, (err) => {
@@ -223,7 +261,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         const unitBookings = cachedActiveBookings.filter(b => b.unitId === u.id || b.unit === u.name);
         
         let isCurrentlyBusy = false;
-        let nextBooking = null;
+        let currentRental: any = null;
+        let nextBooking: any = null;
         let nextBookingStartMs = Infinity;
 
         unitBookings.forEach(b => {
@@ -234,8 +273,9 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
           if (now >= startMs && now <= endMs) {
             isCurrentlyBusy = true;
+            currentRental = { ...b, startMs, endMs, durHours };
           } else if (startMs > now && startMs < nextBookingStartMs) {
-            nextBooking = b;
+            nextBooking = { ...b, startMs, endMs, durHours };
             nextBookingStartMs = startMs;
           }
         });
@@ -244,7 +284,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
         return {
           ...u,
           status: isBusy ? 'Disewa' : (u.status || 'Ready'),
-          nextBooking: !isBusy && nextBooking ? nextBooking : null
+          currentRental,
+          nextBooking: nextBooking
         };
       });
     };
@@ -620,16 +661,30 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                   </div>
                 </div>
 
+                {unit.currentRental && (
+                  <div className="mt-2 bg-red-500/10 border border-red-500/20 p-2 rounded-xl flex items-start gap-1.5 shadow-inner">
+                    <span className="text-red-400 text-[10px] shrink-0 mt-0.5">🔴</span>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold text-red-400 uppercase tracking-wider mb-0.5 leading-tight">
+                        SEDANG DISEWA HINGGA:
+                      </p>
+                      <p className="text-[9px] font-medium text-red-300/90 leading-tight">
+                        {new Date(unit.currentRental.isoEnd || unit.currentRental.endMs).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {unit.nextBooking && (
-                  <div className="mt-2 bg-orange-500/10 border border-orange-500/20 p-2 rounded-lg flex items-start gap-1.5 shadow-inner">
+                  <div className="mt-2 bg-orange-500/10 border border-orange-500/20 p-2 rounded-xl flex items-start gap-1.5 shadow-inner">
                     <span className="text-orange-500 text-[10px] shrink-0 mt-0.5">⚠️</span>
                     <div className="min-w-0">
                       <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-0.5 leading-tight">
-                        Telah dipesan untuk:
+                        AKAN DISEWA :
                       </p>
                       <p className="text-[9px] font-medium text-orange-400/90 leading-tight">
-                        {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
-                        <span className="opacity-70 ml-1">({formatSmartDuration(Number(unit.nextBooking.durationHours || unit.nextBooking.duration || 24))})</span>
+                        {new Date(unit.nextBooking.isoStart || unit.nextBooking.startTime || unit.nextBooking.startMs).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB 
+                        <span className="opacity-80 ml-1 font-semibold">({formatSmartDuration(Number(unit.nextBooking.durationHours || unit.nextBooking.duration || unit.nextBooking.durHours || 24))})</span>
                       </p>
                       <p className="text-[8px] text-orange-500/60 mt-1 italic leading-tight">Silakan sewa jika durasi Anda tidak menabrak jadwal ini.</p>
                     </div>
@@ -651,14 +706,16 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
                       setSelectedUnit(unit);
                       setSelectedTierIndex(0);
                     }}
-                    disabled={unit.status !== 'Ready'}
+                    disabled={unit.status === 'Maintenance'}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                       unit.status === 'Ready' 
                       ? 'bg-playbox-accent text-white hover:bg-opacity-90 active:scale-95 shadow-[0_4px_12px_rgba(37,99,235,0.35)]' 
+                      : unit.status === 'Disewa'
+                      ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30 hover:bg-orange-500/30 active:scale-95'
                       : 'bg-white/5 text-white/30 cursor-not-allowed'
                     }`}
                   >
-                    {unit.status === 'Ready' ? 'Booking' : 'Disewa'}
+                    {unit.status === 'Ready' ? 'Booking' : unit.status === 'Disewa' ? 'Sewa Jadwal' : 'Maintenance'}
                   </button>
                 </div>
               </div>
