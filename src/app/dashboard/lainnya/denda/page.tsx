@@ -64,7 +64,7 @@ export default function DendaSettingsPage() {
   };
 
   return (
-    <div className="p-4 pb-36 min-h-screen flex flex-col relative">
+    <div className="p-4 max-w-xl mx-auto pb-48 min-h-screen flex flex-col relative">
       <div className="ambient-glow"></div>
 
       {/* Header */}
@@ -78,40 +78,40 @@ export default function DendaSettingsPage() {
         </div>
       </div>
 
-      <div className="relative z-10 space-y-6">
-        <form onSubmit={handleSave} className="glass-surface p-5 rounded-2xl space-y-5">
-          <div className="p-4 bg-playbox-ready/10 border border-playbox-ready/20 rounded-xl text-playbox-ready text-[11px] leading-relaxed">
-            <strong className="block mb-1">💡 Cara Kerja:</strong>
-            Sistem akan menghitung denda keterlambatan secara otomatis saat Anda membuat Invoice Selesai. Jika klien lewat dari masa toleransi, akan dikalikan dengan tarif per jam di bawah ini.
+      <div className="relative z-10 space-y-6 mb-12">
+        <form onSubmit={handleSave} className="glass-surface p-6 rounded-3xl space-y-6">
+          <div className="p-4 bg-playbox-ready/10 border border-playbox-ready/20 rounded-2xl text-playbox-ready text-xs leading-relaxed">
+            <strong className="block mb-1 font-bold">💡 Cara Kerja:</strong>
+            Sistem akan menghitung denda keterlambatan secara otomatis saat Anda membuat Invoice Selesai. Jika penyewa lewat dari masa toleransi, akan otomatis dikalikan dengan tarif per jam di bawah ini.
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Masa Toleransi (Menit)</label>
-            <p className="text-[10px] text-white/50 mb-2">Batas waktu aman sebelum dihitung telat.</p>
+            <label className="block text-xs font-bold text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Masa Toleransi (Menit)</label>
+            <p className="text-xs text-white/50 mb-2">Batas waktu aman setelah jam sewa habis sebelum mulai dihitung denda.</p>
             <div className="relative">
               <input 
                 type="number" 
                 value={tolerance}
                 onChange={e => setTolerance(e.target.value)}
-                className="w-full p-4 pr-16 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-colors"
+                className="w-full p-4 pr-16 rounded-2xl bg-black/30 border border-white/10 text-white text-sm font-semibold focus:outline-none focus:border-playbox-accent transition-colors"
                 placeholder="Mis: 15"
                 min="0"
                 required
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm font-medium">Menit</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm font-bold">Menit</span>
             </div>
           </div>
           
           <div>
-            <label className="block text-xs font-medium text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Tarif Denda (Per Jam)</label>
-            <p className="text-[10px] text-white/50 mb-2">Berlaku kelipatan (misal telat 2 jam = 2 x tarif).</p>
+            <label className="block text-xs font-bold text-playbox-text-secondary mb-1.5 uppercase tracking-wider">Tarif Denda (Per Jam)</label>
+            <p className="text-xs text-white/50 mb-2">Tarif denda per jam keterlambatan (berlaku kelipatan, misal telat 2 jam = 2 x tarif).</p>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm font-medium">Rp</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-playbox-text-secondary text-sm font-bold">Rp</span>
               <input 
                 type="number" 
                 value={hourlyRate}
                 onChange={e => setHourlyRate(e.target.value)}
-                className="w-full p-4 pl-12 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:border-playbox-accent transition-colors"
+                className="w-full p-4 pl-12 rounded-2xl bg-black/30 border border-white/10 text-white text-sm font-semibold focus:outline-none focus:border-playbox-accent transition-colors"
                 placeholder="Mis: 20000"
                 min="0"
                 required
@@ -119,15 +119,25 @@ export default function DendaSettingsPage() {
             </div>
           </div>
 
-          {/* Floating Action Button */}
-          <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 pb-6 sm:pb-4 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
-            <div className="max-w-md mx-auto">
+          {/* Docked Action Button Bar */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
+            <div className="max-w-xl mx-auto">
               <button 
                 type="submit" 
                 disabled={isSaving}
-                className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide disabled:opacity-50"
+                className="w-full py-4 saas-button rounded-2xl font-bold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-sm tracking-wide disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center"
               >
-                {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan Denda'}
+                {isSaving ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Menyimpan...
+                  </span>
+                ) : (
+                  'Simpan Pengaturan Denda'
+                )}
               </button>
             </div>
           </div>

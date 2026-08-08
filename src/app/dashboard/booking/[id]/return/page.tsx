@@ -204,7 +204,7 @@ export default function ReturnCheck() {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-48 relative min-h-screen">
+    <div className="max-w-xl mx-auto p-4 space-y-6 pb-48 relative min-h-screen">
       <div className="ambient-glow"></div>
 
       {/* Header */}
@@ -338,9 +338,9 @@ export default function ReturnCheck() {
         
       </div>
 
-      {/* Bottom Nav */}
-      <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 pb-6 sm:pb-4 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
-        <div className="max-w-md mx-auto space-y-3">
+      {/* Docked Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
+        <div className="max-w-xl mx-auto space-y-3">
           {bookingData?.documents && bookingData.documents.length > 0 && (
             <div className="bg-yellow-500/20 border border-yellow-500/50 p-3 rounded-xl flex items-start space-x-3 shadow-[0_0_15px_rgba(234,179,8,0.2)] animate-pulse">
               <svg className="w-6 h-6 text-yellow-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -352,9 +352,10 @@ export default function ReturnCheck() {
           )}
           <button 
             onClick={handleFinish} 
-            className="w-full py-4 saas-button rounded-2xl font-semibold shadow-[0_0_20px_rgba(37,99,235,0.4)] text-sm tracking-wide"
+            disabled={isSubmitting}
+            className="w-full py-4 saas-button rounded-2xl font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] text-sm tracking-wide disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center"
           >
-            Selesai Pengecekan
+            {isSubmitting ? 'Menyimpan...' : 'Selesai Pengecekan'}
           </button>
         </div>
       </div>

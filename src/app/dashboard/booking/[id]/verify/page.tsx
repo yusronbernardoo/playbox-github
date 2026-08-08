@@ -1,12 +1,11 @@
 'use client';
 import { getStoreId, getTenantStorageKey } from '@/lib/tenant';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { formatSmartCountdown, formatSmartDuration } from '@/lib/format';
 import { toPng } from 'html-to-image';
-import { useRef } from 'react';
 
 export default function VerifyBooking({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -22,6 +21,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
   const [businessName, setBusinessName] = useState('PLAYBOX');
   const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
   
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
@@ -71,7 +71,7 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
     });
 
     // Load Ongkir Rules
-    const savedRules = localStorage.getItem('playbox_delivery_rules');
+    const savedRules = localStorage.getItem(getTenantStorageKey('playbox_delivery_rules')) || localStorage.getItem('playbox_delivery_rules');
     if (savedRules) {
       setDeliveryRules(JSON.parse(savedRules));
     } else {
@@ -167,42 +167,52 @@ export default function VerifyBooking({ params }: { params: Promise<{ id: string
       ...extraData
     };
 
-    // 1. Sync ke Cloud Firestore
+    // 1. Update state local immediately
+    setBooking((prev: any) => ({ ...prev, ...updatePayload }));
+
+    // 2. Sync ke Cloud Firestore using setDoc with merge: true
     try {
-      await updateDoc(doc(db, 'stores', getStoreId(), 'bookings', id), updatePayload);
+      await setDoc(doc(db, 'stores', getStoreId(), 'bookings', id), updatePayload, { merge: true });
     } catch (err) {
       console.error('Failed to update status in Firestore:', err);
     }
 
-    // 2. Sync ke localStorage
-    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
-    if (saved) {
-      const bookings = JSON.parse(saved);
-      const updated = bookings.map((b: any) => {
-        if (b.id === id) {
-          return {
-            ...b,
-            ...updatePayload
-          };
-        }
-        return b;
-      });
-      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(updated));
-      setBooking((prev: any) => ({ ...prev, ...updatePayload }));
+    // 3. Sync ke localStorage
+    try {
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
+      let bookings = saved ? JSON.parse(saved) : [];
+      const exists = bookings.some((b: any) => b.id === id);
+      if (exists) {
+        bookings = bookings.map((b: any) => b.id === id ? { ...b, ...updatePayload } : b);
+      } else if (booking) {
+        bookings.unshift({ ...booking, ...updatePayload });
+      }
+      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(bookings));
+    } catch (err) {
+      console.warn('LocalStorage sync warning:', err);
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (booking?.requireDelivery && !distance) {
       alert('Mohon masukkan estimasi Jarak Pengiriman (Km) terlebih dahulu!');
       return;
     }
 
-    handleUpdateStatus('Menunggu Pembayaran', 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20', {
-      deliveryFee: calculatedOngkir,
-      totalPrice: (Number(booking.unitPrice) || Number(booking.totalPrice) || 0) + calculatedOngkir,
-      needAction: true
-    });
+    setIsUpdating(true);
+    try {
+      await handleUpdateStatus('Menunggu Pembayaran', 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20', {
+        deliveryFee: calculatedOngkir,
+        totalPrice: (Number(booking.unitPrice) || Number(booking.totalPrice) || 0) + calculatedOngkir,
+        needAction: true
+      });
+      alert('⚡ Pesanan berhasil diverifikasi!\n\nStatus pesanan sekarang "Menunggu Pembayaran". Anda dapat membagikan rincian tagihan ke WhatsApp customer.');
+    } catch (err) {
+      console.error('Error verifying booking:', err);
+      alert('Gagal memverifikasi pesanan. Silakan coba lagi.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleSendWA = async () => {
@@ -261,62 +271,71 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
   };
 
   const handleMarkAsPaid = async () => {
-    const confirm = window.confirm('Apakah bukti transfer sudah valid dan uang sudah diterima?');
+    const confirm = window.confirm('Apakah bukti transfer sudah valid dan pembayaran sudah diterima?');
     if (confirm) {
-      // 1. Update status booking menjadi Sedang Dipakai
-      // Jangan timpa isoStart dan isoEnd jika customer sudah memilih jadwal di masa depan!
-      const updateData: any = { 
-        needAction: false,
-        paymentStatus: 'Lunas'
-      };
+      setIsUpdating(true);
+      try {
+        const updateData: any = { 
+          needAction: false,
+          paymentStatus: 'Lunas'
+        };
 
-      if (!booking.isoStart) {
-        // Fallback untuk data lama yang tidak punya isoStart
-        const now = new Date();
-        const dur = Number(booking.durationHours || booking.duration || 24);
-        const endTime = new Date(now.getTime() + (dur * 60 * 60 * 1000));
-        
-        updateData.startTime = now.toISOString();
-        updateData.endTime = endTime.toISOString();
-        updateData.isoStart = now.toISOString();
-        updateData.isoEnd = endTime.toISOString();
+        if (!booking.isoStart) {
+          // Fallback untuk data lama yang tidak punya isoStart
+          const now = new Date();
+          const dur = Number(booking.durationHours || booking.duration || 24);
+          const endTime = new Date(now.getTime() + (dur * 60 * 60 * 1000));
+          
+          updateData.startTime = now.toISOString();
+          updateData.endTime = endTime.toISOString();
+          updateData.isoStart = now.toISOString();
+          updateData.isoEnd = endTime.toISOString();
+        }
+
+        await handleUpdateStatus('Sedang Dipakai', 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20', updateData);
+        alert('✅ Pesanan Lunas! Status telah diaktifkan menjadi Sedang Dipakai.');
+        router.push('/dashboard/booking');
+      } catch (err) {
+        console.error('Error confirming payment:', err);
+        alert('Gagal mengonfirmasi pembayaran. Silakan coba lagi.');
+      } finally {
+        setIsUpdating(false);
       }
-
-      await handleUpdateStatus('Sedang Dipakai', 'bg-playbox-disewa/10 text-playbox-accent border border-playbox-disewa/20', updateData);
-      
-      // 2. Update status unit di katalog (Firestore & localStorage)
-      // DIHAPUS: Kita tidak lagi memaksa status unit menjadi 'Disewa' di database.
-      // Ketersediaan unit sekarang dihitung otomatis secara dinamis (real-time calendar) di halaman katalog.
-
-      alert('Pesanan Lunas! Jadwal telah diamankan.');
-      router.push('/dashboard/booking');
     }
   };
 
   const handleReject = async () => {
-    const confirmReject = window.confirm("Yakin ingin menolak pesanan ini?");
+    const confirmReject = window.confirm("Yakin ingin menolak pesanan ini? Pesanan akan dihapus.");
     if (!confirmReject) return;
 
+    setIsUpdating(true);
     try {
       await deleteDoc(doc(db, 'stores', getStoreId(), 'bookings', id));
     } catch (err) {
       console.error('Error deleting doc from firestore:', err);
     }
 
-    const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
-    if (saved) {
-      const bookings = JSON.parse(saved);
-      const updated = bookings.filter((b: any) => b.id !== id);
-      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(updated));
-    }
+    try {
+      const saved = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
+      if (saved) {
+        const bookings = JSON.parse(saved);
+        const updated = bookings.filter((b: any) => b.id !== id);
+        localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(updated));
+      }
+    } catch {}
     
+    setIsUpdating(false);
+    alert('Pesanan telah ditolak dan dihapus.');
     router.push('/dashboard/booking');
   };
 
   if (!booking) {
     return (
-      <div className="p-8 text-center text-white/50">
-        <p>Memuat data pesanan...</p>
+      <div className="p-8 text-center text-white/50 min-h-screen flex items-center justify-center">
+        <div className="space-y-2">
+          <div className="w-8 h-8 border-2 border-playbox-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm">Memuat data pesanan...</p>
+        </div>
       </div>
     );
   }
@@ -336,7 +355,7 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
   }
 
   return (
-    <div className="p-4 space-y-6 pb-36 relative">
+    <div className="max-w-xl mx-auto p-4 space-y-6 pb-48 relative min-h-screen">
       <div className="ambient-glow"></div>
       
       {/* Header */}
@@ -350,210 +369,204 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
         </div>
       </div>
 
-      <div className="glass-surface-elevated p-6 rounded-3xl relative overflow-hidden border border-white/10">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-playbox-accent/10 rounded-full blur-3xl"></div>
-        <div className="flex justify-between items-start mb-1">
-          <h2 className="text-xs font-semibold text-playbox-text-secondary uppercase tracking-widest">Kode Invoice</h2>
-          <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${displayStatus === 'Menunggu Hari H' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : booking.statusColor}`}>
+      {/* Hero Booking Status Card */}
+      <div className="glass-surface-elevated p-6 rounded-3xl relative overflow-hidden">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <span className="text-[10px] font-bold text-playbox-text-secondary uppercase tracking-widest block mb-1">KODE BOOKING</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xl font-black text-white tracking-wider">{booking.code}</span>
+              <button 
+                onClick={() => handleCopyText(booking.code, 'code')}
+                className="text-xs bg-white/10 hover:bg-white/20 text-white/70 px-2 py-0.5 rounded transition-colors flex items-center space-x-1"
+              >
+                <span>{copiedField === 'code' ? '✓ Tersalin' : 'Salin'}</span>
+              </button>
+            </div>
+          </div>
+          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${booking.statusColor || 'bg-white/10 text-white'}`}>
             {displayStatus}
           </span>
         </div>
-        <p className="font-bold text-2xl text-white tracking-tight">{booking.code}</p>
-        
-        <div className="mt-5 space-y-3 pt-5 border-t border-white/5">
-          <div className="flex items-start">
-            <span className="w-6 text-playbox-text-secondary">🎮</span>
-            <div>
-              <p className="text-sm font-semibold text-white">{booking.unit}</p>
-            </div>
+
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5 text-sm">
+          <div>
+            <span className="text-[10px] text-white/50 block">Unit Rental</span>
+            <span className="font-bold text-white text-base">{booking.unit}</span>
           </div>
-          <div className="flex items-start">
-            <span className="w-6 text-playbox-text-secondary">🕒</span>
-            <div>
-              <p className="text-sm font-semibold text-white">
-                {displayDate} <span className="text-playbox-accent ml-1 font-bold">({formatSmartDuration(Number(displayDuration))})</span>
-              </p>
-            </div>
+          <div>
+            <span className="text-[10px] text-white/50 block">Durasi Sewa</span>
+            <span className="font-bold text-white text-base">{formatSmartDuration(Number(displayDuration))}</span>
           </div>
-          <div className="flex items-start">
-            <span className="w-6 text-playbox-text-secondary">🛵</span>
-            <div>
-              <p className="text-sm font-semibold text-white">
-                {booking.requireDelivery ? 'Antar - Jemput (+Ongkir)' : 'Ambil di Toko (Mandiri)'}
-              </p>
-            </div>
+          <div>
+            <span className="text-[10px] text-white/50 block">Tanggal Sewa</span>
+            <span className="font-medium text-white/90">{displayDate}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-white/50 block">Tipe Layanan</span>
+            <span className="font-medium text-white/90">{booking.requireDelivery ? '🚚 Antar - Jemput' : '🏪 Ambil Sendiri'}</span>
           </div>
         </div>
 
-        {(booking.startTime || booking.isoStart) && (booking.endTime || booking.isoEnd) && (
-          <div className="mt-4 flex flex-col space-y-2 mb-2">
-            <div className="flex justify-between items-center p-4 bg-gradient-to-r from-playbox-accent/20 to-playbox-accent/5 border border-playbox-accent/30 rounded-2xl">
-              <div>
-                <p className="text-[10px] text-playbox-accent font-bold uppercase tracking-wider mb-1">Mulai Sewa</p>
-                <p className="text-sm font-bold text-white">{new Date(booking.startTime || booking.isoStart).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-playbox-accent font-bold uppercase tracking-wider mb-1">Akhir Sewa</p>
-                <p className="text-sm font-bold text-white">{new Date(booking.endTime || booking.isoEnd).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-              </div>
-            </div>
-            {booking.status === 'Selesai' ? (
-              <div className="flex justify-between items-center px-4 py-3 bg-playbox-ready/10 border border-playbox-ready/20 rounded-2xl">
-                <span className="text-xs font-bold text-playbox-ready uppercase tracking-wider">Status Waktu</span>
-                <span className="text-sm font-black text-playbox-ready">SELESAI ✔️</span>
-              </div>
-              ) : (
-                <div className="flex justify-between items-center px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl">
-                  <span className="text-xs font-bold text-yellow-500/90 uppercase tracking-wider">{timeLabel}</span>
-                  <span className="text-sm font-black text-yellow-500 animate-pulse drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">{timeLeft || 'Menghitung...'}</span>
-                </div>
-              )}
+        {timeLeft && (
+          <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center bg-white/5 -mx-6 -mb-6 p-4 px-6 rounded-b-3xl">
+            <span className="text-xs text-white/70">{timeLabel}</span>
+            <span className="text-xs font-black text-playbox-accent bg-playbox-accent/10 px-2.5 py-1 rounded-lg">{timeLeft}</span>
           </div>
         )}
       </div>
 
-      <div className="glass-surface p-5 rounded-3xl space-y-4 border border-white/5">
-        <h2 className="text-xs font-bold text-white/80 uppercase tracking-widest">Data Customer</h2>
-        
-        {/* Nama Lengkap */}
-        <div className="bg-black/25 p-3 rounded-2xl border border-white/5">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[11px] font-medium text-playbox-text-secondary">Nama Lengkap</span>
-            {copiedField === 'name' && <span className="text-[10px] text-[#25D366] font-bold animate-pulse">Tersalin!</span>}
-          </div>
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <p className="font-bold text-sm text-white/95 truncate min-w-0 flex-1">{booking.customer || '-'}</p>
-            <button 
-              type="button"
-              onClick={() => handleCopyText(booking.customer, 'name')}
-              title="Salin Nama"
-              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs shrink-0 transition-colors"
-            >
-              📋 Salin
-            </button>
-          </div>
-        </div>
+      {/* Customer Info Card */}
+      <div className="glass-surface p-6 rounded-3xl space-y-4">
+        <h2 className="text-xs font-bold text-playbox-text-secondary uppercase tracking-widest flex items-center">
+          <span className="mr-2 text-lg">👤</span> Informasi Customer
+        </h2>
 
-        {/* Nomor WhatsApp */}
-        <div className="bg-black/25 p-3 rounded-2xl border border-white/5">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[11px] font-medium text-playbox-text-secondary">Nomor WhatsApp</span>
-            {copiedField === 'phone' && <span className="text-[10px] text-[#25D366] font-bold animate-pulse">Tersalin!</span>}
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between items-center py-2 border-b border-white/5">
+            <span className="text-white/50 text-xs">Nama Lengkap</span>
+            <span className="font-bold text-white">{booking.customer}</span>
           </div>
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <p className="font-bold text-sm text-white/95 truncate min-w-0 flex-1">{booking.customerPhone || '-'}</p>
-            <div className="flex items-center space-x-1.5 shrink-0">
-              {booking.customerPhone && (
-                <a 
-                  href={`https://wa.me/${booking.customerPhone.replace(/\D/g, '').startsWith('0') ? '62' + booking.customerPhone.replace(/\D/g, '').slice(1) : booking.customerPhone.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 text-xs font-semibold flex items-center gap-1 transition-colors"
-                >
-                  <span>💬</span> WA
-                </a>
-              )}
-              <button 
-                type="button"
-                onClick={() => handleCopyText(booking.customerPhone, 'phone')}
-                title="Salin Nomor"
-                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs transition-colors"
+          
+          <div className="flex justify-between items-center py-2 border-b border-white/5">
+            <span className="text-white/50 text-xs">Nomor WhatsApp</span>
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-white">{booking.customerPhone}</span>
+              <a 
+                href={`https://wa.me/${booking.customerPhone?.startsWith('0') ? '62' + booking.customerPhone.slice(1) : booking.customerPhone}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs bg-[#25D366]/20 text-[#25D366] px-2 py-0.5 rounded font-bold hover:bg-[#25D366]/30 transition-colors"
               >
-                📋
-              </button>
+                Chat WA
+              </a>
             </div>
           </div>
-        </div>
 
-        {/* Alamat Domisili / Pengiriman */}
-        <div className="bg-black/25 p-3 rounded-2xl border border-white/5">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[11px] font-medium text-playbox-text-secondary">Alamat Domisili / Pengiriman</span>
-            {copiedField === 'address' && <span className="text-[10px] text-[#25D366] font-bold animate-pulse">Tersalin!</span>}
+          <div className="py-2 border-b border-white/5">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-white/50 text-xs">Alamat Pengiriman</span>
+              {displayAddress !== '-' && (
+                <button 
+                  onClick={() => handleCopyText(displayAddress, 'address')}
+                  className="text-[11px] text-playbox-accent hover:underline"
+                >
+                  {copiedField === 'address' ? '✓ Tersalin' : 'Salin Alamat'}
+                </button>
+              )}
+            </div>
+            <p className="text-white/90 text-xs leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5 mt-1">
+              {displayAddress}
+            </p>
           </div>
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <p className="font-semibold text-sm text-white/90 truncate min-w-0 flex-1">{displayAddress || '-'}</p>
-            <button 
-              type="button"
-              onClick={() => handleCopyText(displayAddress, 'address')}
-              title="Salin Alamat"
-              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs shrink-0 transition-colors"
-            >
-              📋 Salin
-            </button>
-          </div>
-        </div>
 
-        <div>
-          <p className="text-xs text-playbox-text-secondary mb-2">Foto KTP / Identitas Jaminan</p>
-          {ktpImage ? (
-            <div 
-              onClick={() => setZoomImage(ktpImage)}
-              className="w-full h-44 bg-black/40 rounded-2xl border border-white/10 overflow-hidden cursor-zoom-in relative group"
-            >
-              <img src={ktpImage} alt="KTP" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white bg-black/70 px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md shadow-lg">🔍 Klik untuk Zoom</span>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full h-32 bg-red-500/10 rounded-2xl border border-red-500/20 flex flex-col items-center justify-center text-red-400">
-              <span className="text-2xl mb-1">⚠️</span>
-              <span className="text-xs font-medium">Tidak ada foto KTP</span>
-            </div>
-          )}
-        </div>
-
-        {/* Bukti Transfer */}
-        <div>
-          <p className="text-xs text-playbox-text-secondary mb-2">Foto Bukti Transfer (Jika Ada)</p>
-          {paymentProofImage ? (
-            <div 
-              onClick={() => setZoomImage(paymentProofImage)}
-              className="w-full h-44 bg-black/40 rounded-2xl border border-white/10 overflow-hidden cursor-zoom-in relative group"
-            >
-              <img src={paymentProofImage} alt="Bukti Transfer" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white bg-black/70 px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md shadow-lg">🔍 Klik untuk Zoom</span>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full h-24 bg-white/5 rounded-2xl border border-white/10 flex flex-col items-center justify-center text-white/40">
-              <span className="text-xl mb-0.5">📄</span>
-              <span className="text-xs font-medium">Belum ada bukti transfer</span>
+          {booking.notes && (
+            <div className="py-2">
+              <span className="text-white/50 text-xs block mb-1">Catatan Tambahan Customer</span>
+              <p className="text-white/80 text-xs italic bg-white/5 p-3 rounded-xl border border-white/5">
+                "{booking.notes}"
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {booking.status === 'Perlu Verifikasi' && booking.requireDelivery && (
-        <div className="glass-surface p-5 rounded-3xl space-y-4 border border-playbox-accent/30 bg-playbox-accent/5">
-          <h2 className="text-xs font-bold text-playbox-accent uppercase tracking-widest flex items-center">
-            <span className="mr-2 text-lg">🛵</span> Hitung Ongkir Pengiriman
+      {/* Dokumen Jaminan & KTP */}
+      <div className="glass-surface p-6 rounded-3xl space-y-4">
+        <h2 className="text-xs font-bold text-playbox-text-secondary uppercase tracking-widest flex items-center">
+          <span className="mr-2 text-lg">🪪</span> Dokumen Jaminan & Identitas
+        </h2>
+
+        {ktpImage ? (
+          <div className="space-y-2">
+            <span className="text-xs text-white/60 block">Foto KTP / Identitas:</span>
+            <div 
+              className="relative aspect-video rounded-2xl overflow-hidden bg-black/40 border border-white/10 cursor-pointer group"
+              onClick={() => setZoomImage(ktpImage)}
+            >
+              <img src={ktpImage} alt="KTP Customer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <span className="text-xs bg-black/70 px-3 py-1.5 rounded-full text-white font-medium">🔍 Klik untuk perbesar</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-white/5 rounded-2xl text-center text-xs text-white/40">
+            Tidak ada foto identitas diunggah
+          </div>
+        )}
+
+        {booking.documents && booking.documents.length > 0 && (
+          <div className="pt-2">
+            <span className="text-xs text-white/60 block mb-2">Jaminan yang Ditahan:</span>
+            <div className="flex flex-wrap gap-2">
+              {booking.documents.map((docItem: any, idx: number) => (
+                <span key={idx} className="bg-playbox-accent/15 text-playbox-accent border border-playbox-accent/30 text-xs px-3 py-1 rounded-xl font-medium">
+                  📌 {docItem.title || docItem.name || 'Dokumen ' + (idx + 1)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bukti Pembayaran */}
+      {paymentProofImage && (
+        <div className="glass-surface p-6 rounded-3xl space-y-4 border border-green-500/20 bg-green-500/5">
+          <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest flex items-center">
+            <span className="mr-2 text-lg">💸</span> Bukti Pembayaran Masuk
           </h2>
+          <div 
+            className="relative aspect-[3/4] max-h-72 rounded-2xl overflow-hidden bg-black/40 border border-green-500/30 cursor-pointer group mx-auto"
+            onClick={() => setZoomImage(paymentProofImage)}
+          >
+            <img src={paymentProofImage} alt="Bukti Transfer" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <span className="text-xs bg-black/70 px-3 py-1.5 rounded-full text-white font-medium">🔍 Klik untuk perbesar</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ongkir Calculation Card (Khusus Antar-Jemput saat Perlu Verifikasi) */}
+      {booking.requireDelivery && booking.status === 'Perlu Verifikasi' && (
+        <div className="glass-surface-elevated p-6 rounded-3xl space-y-4 border border-yellow-500/30 bg-yellow-500/5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-yellow-400 uppercase tracking-widest flex items-center">
+              <span className="mr-2 text-lg">🚚</span> Hitung Ongkir Pengiriman
+            </h2>
+            <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-md font-bold">Wajib Diisi</span>
+          </div>
           
-          <div className="space-y-4">
+          <p className="text-xs text-white/70 leading-relaxed">
+            Masukkan estimasi jarak ke lokasi customer untuk menghitung tarif ongkos kirim secara otomatis sesuai aturan ongkir toko.
+          </p>
+
+          <div className="space-y-3 pt-2">
             <div>
-              <label className="block text-xs text-white/70 mb-2">Jarak Rumah Pelanggan ke Toko (Km)</label>
-              <input 
-                type="number"
-                value={distance}
-                onChange={e => setDistance(e.target.value)}
-                placeholder="Misal: 8"
-                className="w-full p-4 rounded-xl bg-black/40 border border-playbox-accent/50 text-white text-lg font-bold focus:outline-none focus:border-playbox-accent"
-              />
-              <p className="text-[10px] text-white/40 mt-2 italic">*Cek jarak di Google Maps berdasarkan alamat pelanggan di atas.</p>
+              <label className="block text-[11px] font-semibold text-white/70 mb-1.5">Jarak Pengiriman (Km)</label>
+              <div className="relative">
+                <input 
+                  type="number" 
+                  step="0.1"
+                  value={distance} 
+                  onChange={e => setDistance(e.target.value)}
+                  placeholder="Contoh: 4.5"
+                  className="w-full p-3.5 pr-14 rounded-xl bg-black/30 border border-white/15 text-white font-bold text-sm focus:outline-none focus:border-yellow-500"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-white/40">KM</span>
+              </div>
             </div>
 
-            <div className="bg-black/30 p-4 rounded-xl flex justify-between items-center border border-white/5">
-              <span className="text-sm text-white/70">Tarif Ongkir Terhitung:</span>
+            <div className="flex justify-between items-center p-4 bg-black/20 rounded-xl border border-white/10">
+              <span className="text-xs text-white/70">Biaya Ongkir Dihitung:</span>
               <span className="text-lg font-bold text-white">Rp {calculatedOngkir.toLocaleString('id-ID')}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Rincian Tagihan & Kirim Tagihan */}
+      {/* Rincian Tagihan & Kirim Tagihan WhatsApp */}
       {booking.status !== 'Perlu Verifikasi' && (
         <div className="glass-surface p-6 rounded-3xl space-y-5 border border-yellow-500/20 bg-yellow-500/5 mt-6">
           <h2 className="text-xs font-bold text-yellow-400 uppercase tracking-widest flex items-center">
@@ -601,30 +614,43 @@ Mohon balas pesan ini dengan mengirimkan foto Bukti Transfer Anda. Terima kasih!
         </div>
       )}
 
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 p-4 pb-6 sm:pb-4 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
-        <div className="flex space-x-3 max-w-md mx-auto">
+      {/* Docked Action Bar at the Bottom */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-[#0A0F1F]/95 backdrop-blur-2xl border-t border-white/10 z-50 shadow-2xl">
+        <div className="max-w-xl mx-auto flex space-x-3">
           {booking.status === 'Perlu Verifikasi' ? (
             <>
               <button 
                 onClick={handleReject} 
-                className="flex-[0.4] py-3.5 bg-red-500/20 text-red-400 border border-red-500/30 font-bold rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-95 text-sm"
+                disabled={isUpdating}
+                className="flex-[0.4] py-4 bg-red-500/20 text-red-400 border border-red-500/30 font-bold rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-95 text-sm disabled:opacity-50"
               >
                 Tolak
               </button>
               <button 
                 onClick={handleVerify} 
-                className="flex-1 py-3.5 bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold rounded-2xl shadow-[0_4px_20px_rgba(234,179,8,0.5)] transition-all active:scale-95 text-sm flex items-center justify-center"
+                disabled={isUpdating}
+                className="flex-1 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold rounded-2xl shadow-[0_4px_20px_rgba(234,179,8,0.5)] transition-all active:scale-95 text-sm flex items-center justify-center disabled:opacity-50"
               >
-                <span>⚡ Verifikasi</span>
+                {isUpdating ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Memverifikasi...
+                  </span>
+                ) : (
+                  <span>⚡ Verifikasi Pesanan</span>
+                )}
               </button>
             </>
           ) : booking.status === 'Menunggu Pembayaran' ? (
             <button 
               onClick={handleMarkAsPaid} 
-              className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-sm flex items-center justify-center"
+              disabled={isUpdating}
+              className="w-full py-4 bg-playbox-accent text-white font-bold rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:bg-opacity-90 transition-all active:scale-95 text-sm flex items-center justify-center disabled:opacity-50"
             >
-              ✅ Konfirmasi Lunas & Aktifkan Unit
+              {isUpdating ? 'Memproses...' : '✅ Konfirmasi Lunas & Aktifkan Unit'}
             </button>
           ) : (
             <button 
