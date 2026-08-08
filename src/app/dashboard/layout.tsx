@@ -6,7 +6,7 @@ import { FirebaseProvider, useFirebase } from '@/context/FirebaseContext';
 import NotificationToast from '@/components/NotificationToast';
 
 function DashboardContent({ children, tabs, pathname }: { children: React.ReactNode, tabs: any[], pathname: string }) {
-  const { isLoading } = useFirebase();
+  const { isLoading, shopInfo } = useFirebase();
 
   if (isLoading) {
     return (
@@ -25,6 +25,36 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
         </div>
       </div>
     );
+  }
+
+  // Check SaaS expiration
+  if (shopInfo) {
+    const isSuspended = shopInfo.status === 'suspended';
+    const isExpired = shopInfo.validUntil && new Date(shopInfo.validUntil) < new Date();
+    
+    if (isSuspended || isExpired) {
+      return (
+        <div className="min-h-screen bg-playbox-bg flex items-center justify-center relative overflow-hidden p-4">
+          <div className="ambient-glow"></div>
+          <div className="glass-surface-elevated p-8 rounded-3xl w-full max-w-sm relative z-10 text-center border border-red-500/20">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-white mb-2">Akses Terkunci</h2>
+            <p className="text-sm text-playbox-text-secondary mb-6 leading-relaxed">
+              {isSuspended 
+                ? 'Akun toko Anda telah ditangguhkan oleh Admin Pusat.' 
+                : 'Masa aktif langganan Anda telah habis.'}
+            </p>
+            <a 
+              href="https://wa.me/6281234567890?text=Halo%20Admin%20Renterva,%20saya%20ingin%20memperpanjang%20langganan%20aplikasi." 
+              target="_blank" 
+              className="w-full block py-3.5 bg-playbox-accent text-white rounded-2xl font-bold shadow-[0_8px_30px_rgba(37,99,235,0.4)] hover:shadow-[0_8px_30px_rgba(37,99,235,0.6)] active:scale-95 transition-all text-sm"
+            >
+              Hubungi Admin via WA
+            </a>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (

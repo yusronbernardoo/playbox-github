@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,6 +17,13 @@ export default function LoginPage() {
 
     // Simulate network delay
     setTimeout(() => {
+      // DUMMY AUTH SUPER ADMIN
+      if (username === 'renterva_hq' && password === '123') {
+        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'renterva_hq', role: 'superadmin', storeId: 'hq' }));
+        router.push('/superadmin');
+        return;
+      }
+
       // DUMMY AUTH MULTI-TENANT: username format is "storeId_role" (e.g. rentalA_bos)
       if (password === '123' && username.includes('_')) {
         const parts = username.split('_');
@@ -128,8 +136,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-white/5 text-center relative z-10">
+        <div className="mt-6 pt-4 border-t border-white/5 text-center relative z-10 flex flex-col gap-2">
           <p className="text-[10px] text-white/30 font-medium">Versi Multi-Tenant 1.0 (Contoh: rentalA_bos / 123)</p>
+          <Link href="/register" className="text-[11px] text-white/50 font-medium hover:text-white transition-colors">
+            Belum punya akun? <span className="text-playbox-accent font-bold">Daftar Toko Gratis</span>
+          </Link>
         </div>
       </div>
     </div>
