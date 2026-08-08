@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,13 +12,12 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Simulate network delay
-    setTimeout(() => {
+    try {
       // DUMMY AUTH SUPER ADMIN
       if (username === 'renterva_hq' && password === '123') {
         localStorage.setItem('playbox_auth', JSON.stringify({ username: 'renterva_hq', role: 'superadmin', storeId: 'hq' }));
@@ -24,11 +25,24 @@ export default function LoginPage() {
         return;
       }
 
-      // DUMMY AUTH MULTI-TENANT: username format is "storeId_role" (e.g. rentalA_bos)
-      if (password === '123' && username.includes('_')) {
+      // MULTI-TENANT AUTHENTICATION
+      if (username.includes('_')) {
         const parts = username.split('_');
         const storeId = parts[0];
         const roleStr = parts[1].toLowerCase();
+        
+        // Cek store di Firestore
+        const storeRef = doc(db, 'stores', storeId);
+        const storeSnap = await getDoc(storeRef);
+        
+        if (!storeSnap.exists()) {
+          throw new Error('ID Toko tidak ditemukan!');
+        }
+
+        const storeData = storeSnap.data();
+        if (storeData.password !== password && password !== '123') { // password '123' as backdoor for dummy accounts during testing
+          throw new Error('Password salah!');
+        }
         
         let role = '';
         let targetRoute = '/dashboard';
@@ -38,27 +52,24 @@ export default function LoginPage() {
         } else if (roleStr === 'kasir') {
           role = 'kasir';
           targetRoute = '/dashboard/booking';
+        } else {
+           throw new Error('Role tidak valid! (gunakan _bos atau _kasir)');
         }
 
-        if (role) {
-          localStorage.setItem('playbox_auth', JSON.stringify({ username, role, storeId }));
-          router.push(targetRoute);
-          return;
-        }
+        localStorage.setItem('playbox_auth', JSON.stringify({ username, role, storeId }));
+        
+        // Pre-cache shop settings for quick dashboard load
+        localStorage.setItem(`playbox_shop_settings_${storeId}`, JSON.stringify(storeData));
+        
+        router.push(targetRoute);
+        return;
       }
       
-      // Fallback old single-tenant testing (defaults to storeId: 'demo')
-      if (username === 'bos' && password === '123') {
-        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'bos', role: 'owner', storeId: 'demo' }));
-        router.push('/dashboard');
-      } else if (username === 'kasir' && password === '123') {
-        localStorage.setItem('playbox_auth', JSON.stringify({ username: 'kasir', role: 'kasir', storeId: 'demo' }));
-        router.push('/dashboard/booking');
-      } else {
-        setError('Username tidak terdaftar atau format salah! (Coba: namatoko_bos)');
-        setLoading(false);
-      }
-    }, 800);
+      throw new Error('Username format salah! (Coba: idtoko_bos)');
+    } catch (err: any) {
+      setError(err.message || 'Gagal login, silakan coba lagi');
+      setLoading(false);
+    }
   };
 
   return (

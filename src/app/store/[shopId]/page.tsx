@@ -151,8 +151,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     let unsubSlugQuery: (() => void) | null = null;
 
     // Cek cache lokal terlebih dahulu untuk instant rendering (0ms delay)
-    const cachedLocal = localStorage.getItem(`playbox_shop_settings_${unwrappedParams.shopId}`) || 
-                        localStorage.getItem(getTenantStorageKey('playbox_shop_settings'));
+    const cachedLocal = localStorage.getItem(`playbox_shop_settings_${unwrappedParams.shopId}`);
     if (cachedLocal) {
       try {
         const parsed = JSON.parse(cachedLocal);
@@ -210,7 +209,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     // D. Local storage & event listener for instant multi-tab sync
     const handleLocalSync = (e: any) => {
       const key = e.detail?.key || e.key;
-      if (key && (key.includes('playbox_shop_settings') || key.includes(unwrappedParams.shopId))) {
+      if (key && (key === `playbox_shop_settings_${effectiveStoreIdRef.current}` || key === `playbox_shop_settings_${unwrappedParams.shopId}`)) {
         try {
           const val = e.detail?.newValue || (typeof window !== 'undefined' ? localStorage.getItem(key) : null);
           if (val) {
@@ -455,7 +454,8 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
     setIsSubmitting(true);
 
     try {
-      const savedBookings = localStorage.getItem(getTenantStorageKey('playbox_mock_bookings'));
+      const targetStoreId = effectiveStoreIdRef.current || effectiveStoreId || unwrappedParams.shopId;
+      const savedBookings = localStorage.getItem(`playbox_mock_bookings_${targetStoreId}`);
       const bookings = savedBookings ? JSON.parse(savedBookings) : [];
       
       const newId = `B0${Date.now().toString().slice(-4)}`;
@@ -514,7 +514,6 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
       };
 
       // 1. Simpan ke Cloud Firestore (Real-Time ke storeId yang tepat)
-      const targetStoreId = effectiveStoreIdRef.current || effectiveStoreId || unwrappedParams.shopId;
       try {
         await setDoc(doc(db, 'stores', targetStoreId, 'bookings', newId), newBooking);
       } catch (err) {
@@ -523,7 +522,7 @@ export default function StorefrontPage({ params }: { params: Promise<{ shopId: s
 
       // 2. Simpan juga ke localStorage
       bookings.unshift(newBooking);
-      localStorage.setItem(getTenantStorageKey('playbox_mock_bookings'), JSON.stringify(bookings));
+      localStorage.setItem(`playbox_mock_bookings_${targetStoreId}`, JSON.stringify(bookings));
       
       setSubmittedBooking(newBooking);
       setIsSubmitting(false);
