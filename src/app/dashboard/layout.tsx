@@ -57,10 +57,27 @@ function DashboardContent({ children, tabs, pathname }: { children: React.ReactN
     }
   }
 
+  let warningBanner = null;
+  if (shopInfo && shopInfo.validUntil) {
+    const validUntil = new Date(shopInfo.validUntil);
+    const daysRemaining = Math.ceil((validUntil.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysRemaining <= 3 && daysRemaining > 0) {
+      warningBanner = (
+        <div className="bg-orange-500/10 border-b border-orange-500/20 px-4 py-2 text-center sticky top-0 z-50 backdrop-blur-md">
+          <p className="text-[11px] sm:text-xs font-bold text-orange-400">
+            ⚠️ Masa aktif langganan sisa {daysRemaining} hari. Segera hubungi Admin untuk perpanjangan.
+          </p>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-playbox-bg text-playbox-text-primary relative overflow-hidden animate-in fade-in zoom-in-95 duration-500">
       {/* Premium Ambient Background */}
       <div className="ambient-glow"></div>
+      {warningBanner}
 
       {/* Main Content Area */}
       <main className="flex-1 pb-24 overflow-y-auto relative z-10">

@@ -43,8 +43,25 @@ export default function SuperAdminPage() {
       snapshot.forEach(doc => {
         data.push({ id: doc.id, ...doc.data() });
       });
-      // Sort by creation date descending
-      data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      // Sort by Priority: Suspended(1), Expired(2), Warning <=3 days (3), Active (4)
+      data.sort((a, b) => {
+        const now = new Date();
+        const aDays = Math.ceil(((a.validUntil ? new Date(a.validUntil) : now).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const bDays = Math.ceil(((b.validUntil ? new Date(b.validUntil) : now).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        const getPriority = (store: any, days: number) => {
+          if (store.status === 'suspended') return 1;
+          if (days <= 0) return 2; // Expired
+          if (days <= 3) return 3; // Warning
+          return 4; // Active
+        };
+        
+        const pA = getPriority(a, aDays);
+        const pB = getPriority(b, bDays);
+        
+        if (pA !== pB) return pA - pB;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
       setStores(data);
     });
 
@@ -173,17 +190,20 @@ export default function SuperAdminPage() {
           {/* CRITICAL FIX: grid-cols-1 forces full width on mobile so content never squishes */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {stores.map((store) => {
-              const isExpired = store.validUntil && new Date(store.validUntil) < new Date();
+              const validUntilDate = store.validUntil ? new Date(store.validUntil) : new Date();
+              const daysRemaining = Math.ceil((validUntilDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              const isExpired = daysRemaining <= 0;
+              const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 3;
               
               return (
-                <div key={store.id} className="bg-[#18181b] rounded-2xl border border-white/10 overflow-hidden flex flex-col">
+                <div key={store.id} className={`bg-[#18181b] rounded-2xl border ${isExpiringSoon ? 'border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.1)]' : 'border-white/10'} overflow-hidden flex flex-col transition-all`}>
                   {/* Card Header */}
                   <div className="p-5 border-b border-white/5 flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold text-base text-white">{store.brandName || 'Toko Tanpa Nama'}</h3>
                       <p className="font-mono text-xs text-white/40 mt-1">ID: {store.id}</p>
                     </div>
-                    <div>
+                    <div className="flex flex-col items-end gap-1">
                       {store.status === 'suspended' ? (
                         <span className="px-2.5 py-1 rounded-md bg-red-500/10 text-red-400 text-xs font-medium border border-red-500/20">Suspended</span>
                       ) : isExpired ? (
@@ -192,6 +212,10 @@ export default function SuperAdminPage() {
                         <span className="px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">Trial</span>
                       ) : (
                         <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-medium border border-emerald-500/20">Active</span>
+                      )}
+                      
+                      {isExpiringSoon && store.status !== 'suspended' && (
+                        <span className="text-[9px] text-orange-400 font-bold uppercase tracking-wider animate-pulse mt-1">Sisa {daysRemaining} Hari</span>
                       )}
                     </div>
                   </div>
